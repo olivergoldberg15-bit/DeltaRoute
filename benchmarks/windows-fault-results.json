@@ -1,59 +1,59 @@
 {
-  "createdAt": "2026-10-17T19:04:52.046Z",
+  "createdAt": "2026-10-17T19:10:48.219Z",
   "scope": "Actual isolated router/process/Git tests using locally compiled fake provider executables. No real model, account, network, API, or subscription calls.",
   "checks": [
     {
       "name": "expired login falls back to Gemini without model call on Codex",
       "passed": true,
-      "elapsedMs": 6229
+      "elapsedMs": 4770
     },
     {
       "name": "outage recovers and counts failed plus successful native usage once",
       "passed": true,
-      "elapsedMs": 7801
+      "elapsedMs": 3625
     },
     {
       "name": "hard quota moves to another subscription",
       "passed": true,
-      "elapsedMs": 4974
+      "elapsedMs": 3663
     },
     {
       "name": "code fallback uses a fresh worktree and preserves original checkout",
       "passed": true,
-      "elapsedMs": 5708
+      "elapsedMs": 7715
     },
     {
       "name": "cancellation stops active child and never launches fallback",
       "passed": true,
-      "elapsedMs": 8292
+      "elapsedMs": 4394
     },
     {
       "name": "whole-attempt timeout includes a hung login probe and falls back",
       "passed": true,
-      "elapsedMs": 6939
+      "elapsedMs": 5333
     },
     {
       "name": "timed out model retains partial native token usage before fallback",
       "passed": true,
-      "elapsedMs": 6802
+      "elapsedMs": 5270
     },
     {
       "name": "all provider quotas exhausted yields an honest coordinator handoff",
       "passed": true,
-      "elapsedMs": 3398
+      "elapsedMs": 3601
     },
     {
       "name": "workflow preserves scoped assignment and gates dependencies until reviewed",
       "passed": true,
-      "elapsedMs": 9268
+      "elapsedMs": 10477
     },
     {
       "name": "workflow rejects code scope drift without a permissive fallback",
       "passed": true,
-      "elapsedMs": 7441
+      "elapsedMs": 5686
     }
   ],
   "passed": 10,
   "failed": 0,
-  "finishedAt": "2026-10-17T19:05:58.909Z"
+  "finishedAt": "2026-10-17T19:11:42.762Z"
 }

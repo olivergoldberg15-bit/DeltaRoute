@@ -2,6 +2,8 @@
 
 The public test suite uses local fixtures and fake provider processes. It does not sign in, contact a model, consume a subscription allowance, or use paid APIs. Historical live measurements are separately labeled below; their raw account artifacts are deliberately excluded from this repository.
 
+Local public-distribution verification on October 17, 2026 passed **195/195 core tests**, **3/3 MCP client fixtures**, **5/5 installer policy fixtures**, and **10/10 Windows fault scenarios**. The full core suite passed from a clean Git clone, including both path-case regressions. Setup, repeated setup preservation, local MCP discovery and the doctor also passed without provider calls or global host changes. See [verification.json](verification.json) for the exact scope; hosted Windows/Linux CI is configured but was not represented as already run.
+
 ## Run the offline tests
 
 From the repository root, with Node.js 22 or newer and Git installed:

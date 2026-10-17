@@ -7,6 +7,8 @@ classification. Windows subprocess tests exercise fake-provider outages, expired
 logins, hard quotas, timeout/cancellation and fresh isolated worktrees. Isolated
 installer tests protect existing approvals and unrelated MCP registrations.
 
+The release clean checkout passed **195/195 core tests**, with **10/10 Windows fault scenarios**, **5/5 installer-policy fixtures** and **3/3 MCP client fixtures**. The 31 bundled skills passed integrity verification. Clean-checkout setup and local diagnostics passed without model calls.
+
 Run the commands and see sanitized results in [benchmarks/README.md](benchmarks/README.md).
 The GitHub Actions workflow is the reproducible release check. An automated pass
 does not prove a future provider login, website selector or model is available.

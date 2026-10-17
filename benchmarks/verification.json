@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "verifiedDate": "2026-10-17",
+  "releaseVersion": "1.5.0",
+  "environment": {
+    "platform": "Windows",
+    "node": "24.16.0",
+    "scratchOverrideUsed": true
+  },
+  "scope": "Offline public-distribution checks. No real provider, account, subscription or network model calls.",
+  "core": {
+    "command": "npm test",
+    "passed": 195,
+    "failed": 0,
+    "skipped": 0,
+    "note": "Full suite passed from a clean Git clone of the committed public distribution, including both path-case regressions."
+  },
+  "subsequentWorkflowSuite": {
+    "passed": 19,
+    "failed": 0,
+    "scope": "Includes explicit Windows and Linux path-case comparisons"
+  },
+  "mcpClientFixtures": {
+    "passed": 3,
+    "failed": 0
+  },
+  "installerPolicyFixtures": {
+    "passed": 5,
+    "failed": 0,
+    "scope": "Fake temporary configuration paths only"
+  },
+  "windowsFaultScenarios": {
+    "passed": 10,
+    "failed": 0,
+    "details": "windows-fault-results.json"
+  },
+  "skillFiles": {
+    "bundledSkills": 31,
+    "optionalUpstreamSkills": 6,
+    "bundledIntegrityPassed": true
+  },
+  "ci": {
+    "configuredPlatforms": [
+      "Windows",
+      "Linux"
+    ],
+    "configuredNodeVersions": [
+      22,
+      24
+    ],
+    "hostedRunVerified": false
+  },
+  "privacy": "Aggregate results only. No raw logs, prompts, answers, home directories, task/session identifiers, authentication state or account details.",
+  "cleanCheckoutSetup": {
+    "configurationCreated": true,
+    "existingConfigurationPreserved": true,
+    "localMcpDiagnosticPassed": true,
+    "doctorPassed": true,
+    "providerCalls": 0,
+    "globalHostConfigurationModified": false,
+    "gitWorkingTreeCleanAfterChecks": true
+  }
+}
