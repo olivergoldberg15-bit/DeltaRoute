@@ -48,7 +48,7 @@ See [setup and providers](docs/SETUP.md) for prerequisites, sign-in, research, v
 | Repetitive read-only work | Claude's native Haiku subagent, when available |
 | Animation, 3D, realism, context and verification | Relevant specialist instructions, loaded on demand |
 
-These are editable starting specialties. Availability and capabilities filter the choices. Explicit checkpoint reviews build memory by **exact model and task category**; three reviews are required before bounded ranking adjustments apply. This is local feedback, not an independently proven model leaderboard.
+These are editable starting specialties. Availability and capabilities filter the choices. Explicit checkpoint reviews build memory by **exact model and task category**; three reviews are required before bounded ranking adjustments apply. Pin explicit model IDs for version-specific comparisons; an account-default alias can change underneath its stored feedback. This is local feedback, not an independently proven model leaderboard.
 
 Small self-contained tasks stay local because worker startup and repeated context can cost more than they save. Routing is a host policy and tool workflow, not an interceptor that guarantees every chat launches a worker.
 

@@ -48,7 +48,11 @@
       22,
       24
     ],
-    "hostedRunVerified": false
+    "hostedRunVerified": true,
+    "verifiedCommit": "b336eaede5b04a6947c7a5860343d85c995759a0",
+    "verifiedTag": "v1.5.0",
+    "url": "https://github.com/olivergoldberg15-bit/DeltaRoute/actions/runs/39061477502",
+    "result": "All five jobs passed: Windows/Linux core on Node 22 and 24, plus Windows subprocess faults and installer policy."
   },
   "privacy": "Aggregate results only. No raw logs, prompts, answers, home directories, task/session identifiers, authentication state or account details.",
   "cleanCheckoutSetup": {

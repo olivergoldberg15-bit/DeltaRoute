@@ -2,7 +2,7 @@
 
 The public test suite uses local fixtures and fake provider processes. It does not sign in, contact a model, consume a subscription allowance, or use paid APIs. Historical live measurements are separately labeled below; their raw account artifacts are deliberately excluded from this repository.
 
-Local public-distribution verification on October 17, 2026 passed **195/195 core tests**, **3/3 MCP client fixtures**, **5/5 installer policy fixtures**, and **10/10 Windows fault scenarios**. The full core suite passed from a clean Git clone, including both path-case regressions. Setup, repeated setup preservation, local MCP discovery and the doctor also passed without provider calls or global host changes. See [verification.json](verification.json) for the exact scope; hosted Windows/Linux CI is configured but was not represented as already run.
+Local public-distribution verification on October 17, 2026 passed **195/195 core tests**, **3/3 MCP client fixtures**, **5/5 installer policy fixtures**, and **10/10 Windows fault scenarios**. The full core suite passed from a clean Git clone, including both path-case regressions. Setup, repeated setup preservation, local MCP discovery and the doctor also passed without provider calls or global host changes. See [verification.json](verification.json) for the exact scope; [hosted Windows/Linux CI passed for the v1.5.0 release](https://github.com/olivergoldberg15-bit/DeltaRoute/actions/runs/39061477502).
 
 ## Run the offline tests
 
@@ -41,7 +41,7 @@ New-Item -ItemType Directory -Force $env:DELTAROUTE_TEST_TMP | Out-Null
 npm test
 ```
 
-GitHub Actions is configured for core tests on Windows and Linux with Node 22 and 24, plus Windows subprocess faults and Python installer policy fixtures. The workflow uploads only the sanitized fault aggregate. Configured CI coverage does not imply a hosted CI run has already passed.
+GitHub Actions is configured for core tests on Windows and Linux with Node 22 and 24, plus Windows subprocess faults and Python installer policy fixtures. The workflow uploads only the sanitized fault aggregate. The released v1.5.0 commit passed all five hosted jobs; the workflow badge shows subsequent branch status.
 
 ## Historical token and latency observations
 
