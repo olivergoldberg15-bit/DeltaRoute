@@ -1,0 +1,8 @@
+export function selectOptimizationSkills(prompt,{contextPercent=null}={}){
+ const p=String(prompt||'');const result=[];
+ if(/\b(logs?|test (suite|run|output|results)|full suite|build output|large (file|json|output|data)|dependencies|coverage|index (the |this )?(repo|docs)|search indexed)\b|\b(run|execute).{0,15}\btests?\b/i.test(p))result.push({name:'context-mode',action:'If context-mode is installed, use local ctx_execute/ctx_execute_file for large output and ctx_index(path)/ctx_search for repeated lookup. Otherwise parse locally and return bounded summaries. Keep browsing on gstack.'});
+ if(/\b(tokens?|cach(e|ing)|cost|context (bloat|usage|window)|quota)\b/i.test(p))result.push({name:'token-optimization',action:'Use built-in list_workers(include_usage=true) for worker totals and native host usage for coordinator counters. Read selected context-optimization guidance if needed; no external token skill is required. Keep prefixes stable; distinguish input reduction, cached reads and actual billing.'});
+ if(/rate.?limit (warning|error|exceeded|hit)|hit (a |the )?rate.?limit|quota (exceeded|exhausted)|context (is )?(full|exhausted)/i.test(p)||(typeof contextPercent==='number'&&contextPercent>=70))result.push({name:'rescue-tokens',action:'Use a bounded handoff or appropriate smaller worker. Preserve user work and instructions; no automatic clear, restart or model switch in an active session.'});
+ if(/(manage|audit|optimize|clean up|unload).{0,24}skills|skill health/i.test(p))result.push({name:'skills-smart-manager',action:'Use skills-manifest.json for read-only inventory. If an external skill manager is installed, simulated context percentage/unloading is not measured usage. Do not remove skills automatically.'});
+ return result;
+}

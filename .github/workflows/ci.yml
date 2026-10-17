@@ -1,0 +1,53 @@
+name: Offline verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Core / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Core unit, fixture and stdio tests
+        run: npm test
+      - name: Reusable MCP client fixtures
+        run: node --test benchmarks/mcp-client.test.mjs
+
+  windows-faults:
+    name: Windows subprocess faults and installer policy
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Local fake-provider fault scenarios
+        run: node benchmarks/provider-fallback-process-tests.mjs
+      - name: Installer rules in fake temporary homes
+        run: python benchmarks/installer-policy-tests.py
+      - name: Upload sanitized scenario aggregate only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-fault-results
+          path: benchmarks/windows-fault-results.json
+          if-no-files-found: ignore

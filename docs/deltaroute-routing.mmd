@@ -1,0 +1,40 @@
+flowchart TB
+    P["Your prompt"] --> C["Current coordinator<br/>Codex or Claude Code<br/>Owns planning, review and integration"]
+    C --> W["Persistent workflow contract<br/>Objective · original constraints · acceptance checks<br/>Task dependencies · approved scope · checkpoints"]
+    X["Local context index<br/>Retrieve only relevant files, logs and decisions"] -.-> W
+    W --> R["Choose dependency-ready, bounded work<br/>At most 2 external workers globally<br/>Coordinator drives each step; no autonomous DAG executor"]
+    R --> A["Codex<br/>Heavy coding · review"]
+    R --> B["Gemini<br/>Quick iteration · large-context tasks"]
+    R --> D["Cursor<br/>Coding integration"]
+    R --> E["Perplexity<br/>Web research · source evidence"]
+    R --> G["Grok via Cursor<br/>Social analysis<br/>Original dated posts + available metrics"]
+    R --> M["Media / animation tasks<br/>Attach relevant specialist skills<br/>HyperFrames · Remotion · Blender · Three.js"]
+    R --> L["Repetitive work<br/>Native lower-model workers<br/>Only when available"]
+    M -.-> MS["Skills guide the selected worker<br/>Local rendering only if renderer is installed<br/>Video URLs: extracted frames + explicit audio / coverage gaps"]
+    A & B & D & E & G & M & L --> O["Bounded worker output<br/>Changes · evidence · checks · unresolved issues"]
+    O --> V["Automated path and evidence checks"]
+    V --> I["Coordinator review and integration<br/>Check against original prompt and acceptance criteria"]
+    I --> K["Accepted checkpoint<br/>Downstream work stays gated until accepted"]
+    K --> N["Next dependency-ready step"]
+    N --> R
+    K --> F["Final result<br/>Verified deliverables + remaining limitations"]
+    O -. "Outage / expired login / quota" .-> FB["Finite subscription fallbacks<br/>Preserve failed attempts and usage"]
+    FB -. "No available worker" .-> C
+    FB -. "Alternative available" .-> R
+    RULE["Subscription-first • No per-token API fallback<br/>No recursive router / coordinator spawning<br/>Grok route does not imply native X access"]
+    classDef primary fill:#e8efff,stroke:#345ee5,color:#16234a;
+    classDef contract fill:#f1ecff,stroke:#7d59c6,color:#31224d;
+    classDef media fill:#fff0f6,stroke:#c14e8a,color:#5b2544;
+    classDef done fill:#e7f5ef,stroke:#2f896b,color:#174c3c;
+    class P,C,R primary;
+    class W,K contract;
+    class M,MS media;
+    class F done;
+
+    I --> RM["Model-strength memory<br/>Reviewed outcomes per model + category<br/>3 reviews before bounded ranking changes"]
+    RM -. "Eligible candidates only" .-> R
+    C -. "Head quota in managed run" .-> HS["Save workflow + session<br/>Confirm old head stopped"]
+    HS --> HC["Other coordinator ready?"]
+    HC -- "Yes: Claude ↔ Codex" --> C
+    HC -- "Both limited" --> HW["Pause new work<br/>No model calls while waiting"]
+    HW -- "Authoritative recovery / verified reset probe" --> C

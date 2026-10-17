@@ -1,0 +1,17 @@
+{
+  "brand": {"name": "DeltaRoute", "symbol": "Δ", "version": "1.5.0"},
+  "maxConcurrent": 2,
+  "timeoutSeconds": 900,
+  "browser": {"command": "", "stateFile": "", "browsersPath": ""},
+  "workers": {
+    "codex": {"enabled": false, "command": "", "model": null, "capabilities": {"visionFrames": true}, "strengths": ["implementation", "debugging", "tests", "review"]},
+    "gemini": {"enabled": false, "command": "", "model": null, "strengths": ["quick_coding", "iteration", "large_context"]},
+    "cursor": {"enabled": false, "command": "", "model": "auto", "strengths": ["implementation", "frontend", "integration"]},
+    "grok": {"enabled": false, "transport": "cursor", "command": "", "model": null, "strengths": ["social_research", "current_events"], "reason": "Requires an explicitly selected Grok model available through your Cursor account; native live X access is not verified."},
+    "perplexity": {"enabled": false, "transport": "browser", "strengths": ["research", "citations"]},
+    "local": {"enabled": false, "model": null, "strengths": ["simple", "summarization"], "reason": "No local model transport has been verified."}
+  },
+  "coordinators": {"claude": {"command": ""}, "codex": {"command": ""}},
+  "fallback": {"enabled": true, "maxAttempts": 4, "attemptTimeoutSeconds": 900, "cooldownMs": {"auth": 1800000, "quota": 900000, "outage": 60000, "timeout": 30000, "challenge": 1800000}},
+  "watch": {"python": "", "ytDlp": "", "script": "", "noPaidAPIs": true}
+}

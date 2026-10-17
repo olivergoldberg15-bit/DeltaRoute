@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="1770" viewBox="0 0 1840 1770" role="img" aria-labelledby="title desc">
+  <title id="title">DeltaRoute: from your prompt to a verified result</title>
+  <desc id="desc">A coordinator-driven tree with a persistent workflow contract, relevant local context, seven bounded task lanes, checks, review and accepted checkpoints. The current Codex or Claude Code coordinator drives dependency-ready work with at most two external workers globally. Skills are guidance, not providers. Finite subscription fallbacks return to the current coordinator if exhausted. Local rendering requires an installed renderer; Grok via Cursor does not imply native X access.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#8493b1"/></marker>
+    <marker id="purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#8769bb"/></marker>
+    <filter id="shadow" x="-10%" y="-15%" width="120%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#263a68" flood-opacity=".055"/></filter>
+    <style>
+      text{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#202f4d} .title{font-size:38px;font-weight:700;letter-spacing:-1px}.subtitle{font-size:18px;fill:#63718a}.eyebrow{font-size:12px;font-weight:700;letter-spacing:1.6px;fill:#75829c}.heading{font-size:20px;font-weight:650}.body{font-size:16px;fill:#52617c}.small{font-size:14px;fill:#61718b}.tiny{font-size:12px;fill:#6b7891}.center{text-anchor:middle}.wire{fill:none;stroke:#a2aec5;stroke-width:2;marker-end:url(#arrow)}.branch{fill:none;stroke:#a2aec5;stroke-width:2}.dashed{fill:none;stroke:#9b83bf;stroke-width:2;stroke-dasharray:6 6;marker-end:url(#purple)}.box{fill:white;stroke:#d9e0ec;stroke-width:1.5;filter:url(#shadow)}.pill{font-size:12px;font-weight:700;letter-spacing:.8px}
+    </style>
+  </defs>
+  <rect width="1840" height="1770" rx="24" fill="#f7f9fd"/>
+  <text x="48" y="65" class="title">Δ DeltaRoute</text>
+  <text x="48" y="98" class="subtitle">Your prompt stays the contract. Agents do bounded work; the coordinator keeps control.</text>
+  <rect x="1434" y="39" width="358" height="35" rx="17.5" fill="#eaf0ff"/>
+  <text x="1613" y="62" class="pill center" fill="#345ee5">SUBSCRIPTION-FIRST ORCHESTRATION</text>
+
+  <!-- Prompt and persistent coordinator contract -->
+  <rect x="730" y="136" width="380" height="64" rx="18" class="box"/>
+  <text x="920" y="175" class="heading center">Your prompt</text>
+  <path d="M920 200V225" class="wire"/>
+  <rect x="620" y="225" width="600" height="94" rx="18" fill="#eaf0ff" stroke="#adc1fa" stroke-width="1.5"/>
+  <text x="920" y="258" class="heading center">Current coordinator · Codex or Claude Code</text>
+  <text x="920" y="287" class="body center">Planning, review and final integration stay here</text>
+  <path d="M920 319V345" class="wire"/>
+  <rect x="540" y="345" width="760" height="110" rx="18" fill="#f1edfc" stroke="#c7b9e7" stroke-width="1.5"/>
+  <text x="920" y="377" class="heading center">Persistent workflow contract</text>
+  <text x="920" y="405" class="body center">Objective · original constraints · acceptance checks</text>
+  <text x="920" y="431" class="body center">Dependencies · approved scope · accepted checkpoints</text>
+
+  <rect x="48" y="352" width="352" height="99" rx="16" class="box"/>
+  <text x="70" y="383" class="heading">Local context index</text>
+  <text x="70" y="411" class="body">Relevant files, logs and decisions</text>
+  <text x="70" y="434" class="small">Retrieve the context this step needs</text>
+  <path d="M400 401H534" class="dashed"/>
+
+  <path d="M920 455V479" class="wire"/>
+  <rect x="540" y="479" width="760" height="75" rx="18" fill="#eaf0ff" stroke="#adc1fa" stroke-width="1.5"/>
+  <text x="920" y="509" class="heading center">Route dependency-ready, bounded work</text>
+  <text x="920" y="535" class="body center">At most 2 external workers globally · coordinator-driven steps</text>
+  <text x="1435" y="502" class="eyebrow">SKILLS ≠ PROVIDERS</text>
+  <text x="1435" y="528" class="small">Specialist guidance is attached only</text>
+  <text x="1435" y="550" class="small">when it helps the selected task.</text>
+
+  <!-- Seven bounded task lanes -->
+  <path d="M920 554V578M164 578H1676" class="branch"/>
+  <path d="M164 578V603M416 578V603M668 578V603M920 578V603M1172 578V603M1424 578V603M1676 578V603" class="wire"/>
+
+  <g>
+    <rect x="48" y="603" width="232" height="177" rx="16" class="box"/>
+    <rect x="66" y="622" width="38" height="28" rx="8" fill="#eaf0ff"/><text x="85" y="642" class="pill center" fill="#345ee5">01</text>
+    <text x="66" y="681" class="heading">Codex</text>
+    <text x="66" y="710" class="body">Heavy coding</text><text x="66" y="735" class="body">Review and feedback</text><text x="66" y="761" class="small">Scoped code changes</text>
+
+    <rect x="300" y="603" width="232" height="177" rx="16" class="box"/>
+    <rect x="318" y="622" width="38" height="28" rx="8" fill="#eaf0ff"/><text x="337" y="642" class="pill center" fill="#345ee5">02</text>
+    <text x="318" y="681" class="heading">Gemini</text>
+    <text x="318" y="710" class="body">Quick iterations</text><text x="318" y="735" class="body">Large-context tasks</text><text x="318" y="761" class="small">Bounded coding briefs</text>
+
+    <rect x="552" y="603" width="232" height="177" rx="16" class="box"/>
+    <rect x="570" y="622" width="38" height="28" rx="8" fill="#eaf0ff"/><text x="589" y="642" class="pill center" fill="#345ee5">03</text>
+    <text x="570" y="681" class="heading">Cursor</text>
+    <text x="570" y="710" class="body">Coding integration</text><text x="570" y="735" class="body">Focused implementation</text><text x="570" y="761" class="small">Subscription CLI worker</text>
+
+    <rect x="804" y="603" width="232" height="177" rx="16" class="box"/>
+    <rect x="822" y="622" width="38" height="28" rx="8" fill="#eaf0ff"/><text x="841" y="642" class="pill center" fill="#345ee5">04</text>
+    <text x="822" y="681" class="heading">Perplexity</text>
+    <text x="822" y="710" class="body">Web research</text><text x="822" y="735" class="body">Sources and evidence</text><text x="822" y="761" class="small">Verify claims against links</text>
+
+    <rect x="1056" y="603" width="232" height="177" rx="16" class="box"/>
+    <rect x="1074" y="622" width="38" height="28" rx="8" fill="#eaf0ff"/><text x="1093" y="642" class="pill center" fill="#345ee5">05</text>
+    <text x="1074" y="681" class="heading">Grok via Cursor</text>
+    <text x="1074" y="710" class="body">Social analysis</text><text x="1074" y="735" class="body">Dated posts + metrics</text><text x="1074" y="761" class="small">No implied native X access</text>
+
+    <rect x="1308" y="603" width="232" height="177" rx="16" fill="#fff0f6" stroke="#e4bad0" stroke-width="1.5"/>
+    <rect x="1326" y="622" width="38" height="28" rx="8" fill="#f8dce9"/><text x="1345" y="642" class="pill center" fill="#a74075">06</text>
+    <text x="1326" y="681" class="heading">Media / animation</text>
+    <text x="1326" y="710" class="body">Task-specific skills</text><text x="1326" y="735" class="body">Selected native worker</text><text x="1326" y="761" class="small">Guidance + verified assets</text>
+
+    <rect x="1560" y="603" width="232" height="177" rx="16" class="box"/>
+    <rect x="1578" y="622" width="38" height="28" rx="8" fill="#eaf0ff"/><text x="1597" y="642" class="pill center" fill="#345ee5">07</text>
+    <text x="1578" y="681" class="heading">Repetitive work</text>
+    <text x="1578" y="710" class="body">Native lower models</text><text x="1578" y="735" class="body">Small, checkable tasks</text><text x="1578" y="761" class="small">Only when available</text>
+  </g>
+
+  <!-- Merge every result into the same acceptance path -->
+  <path d="M164 780V807M416 780V807M668 780V807M920 780V807M1172 780V807M1424 780V807M1676 780V807M164 807H1676" class="branch"/>
+  <path d="M920 807V846" class="wire"/>
+  <rect x="590" y="846" width="660" height="73" rx="17" class="box"/>
+  <text x="920" y="876" class="heading center">Bounded worker output</text>
+  <text x="920" y="902" class="body center">Changes · evidence · checks · unresolved issues</text>
+
+  <rect x="1332" y="847" width="460" height="140" rx="16" fill="#fff5f9" stroke="#e4c5d5" stroke-width="1.5"/>
+  <text x="1353" y="876" class="heading">Media skills, loaded as needed</text>
+  <text x="1353" y="904" class="body">HyperFrames · Remotion · Blender · Three.js</text>
+  <text x="1353" y="931" class="small">Local rendering only if the renderer is installed</text>
+  <text x="1353" y="955" class="small">Video URLs → frames; disclose sampling + audio gaps</text>
+  <path d="M1515 780V828H1562V842" class="dashed"/>
+
+  <path d="M920 919V949" class="wire"/>
+  <rect x="590" y="949" width="660" height="64" rx="17" class="box"/>
+  <text x="920" y="989" class="heading center">Automated path and evidence checks</text>
+  <path d="M920 1013V1043" class="wire"/>
+  <rect x="590" y="1043" width="660" height="83" rx="17" fill="#eaf0ff" stroke="#adc1fa" stroke-width="1.5"/>
+  <text x="920" y="1075" class="heading center">Coordinator review and integration</text>
+  <text x="920" y="1103" class="body center">Compare with the original prompt and acceptance checks</text>
+  <path d="M920 1126V1156" class="wire"/>
+  <rect x="590" y="1156" width="660" height="82" rx="17" fill="#f1edfc" stroke="#c7b9e7" stroke-width="1.5"/>
+  <text x="920" y="1188" class="heading center">Accepted checkpoint</text>
+  <text x="920" y="1216" class="body center">Downstream tasks stay gated until the result is accepted</text>
+
+  <!-- Explicit coordinator-driven continuation loop -->
+  <path d="M1250 1197H1536" class="wire"/>
+  <rect x="1536" y="1157" width="256" height="81" rx="16" class="box"/>
+  <text x="1664" y="1189" class="heading center">Next ready step</text>
+  <text x="1664" y="1216" class="small center">Use the saved workflow state</text>
+  <path d="M1792 1197H1815V517H1306" class="dashed"/>
+
+  <!-- Outage handling never spawns another coordinator -->
+  <rect x="48" y="892" width="405" height="184" rx="17" fill="#fff8eb" stroke="#e6d2a8" stroke-width="1.5"/>
+  <text x="71" y="925" class="heading">If a provider cannot finish</text>
+  <text x="71" y="955" class="body">Outage · expired login · hard quota</text>
+  <text x="71" y="984" class="body">Try finite subscription alternatives</text>
+  <text x="71" y="1013" class="body">Preserve attempts, usage and evidence</text>
+  <text x="71" y="1046" class="small">Exhausted → current coordinator continues</text>
+  <path d="M590 882H488V924H459" class="dashed"/>
+  <text x="71" y="1106" class="small">No recursive router or coordinator spawning</text>
+
+  <path d="M920 1238V1283" class="wire"/>
+  <rect x="590" y="1283" width="660" height="86" rx="18" fill="#e7f5ef" stroke="#9dcdb9" stroke-width="1.5"/>
+  <text x="920" y="1317" class="heading center">Final result</text>
+  <text x="920" y="1345" class="body center">Verified deliverables · scope covered · remaining limitations</text>
+
+  <path d="M48 1410H1792" stroke="#dce3ef"/>
+  <circle cx="57" cy="1446" r="5" fill="#345ee5"/><text x="73" y="1452" class="small">Subscription-first · no per-token API fallback</text>
+  <circle cx="617" cy="1446" r="5" fill="#8769bb"/><text x="633" y="1452" class="small">Persistent, coordinator-driven workflow</text>
+  <circle cx="1185" cy="1446" r="5" fill="#c14e8a"/><text x="1201" y="1452" class="small">Skills guide work; evidence gates completion</text>
+  <text x="48" y="1484" class="tiny">A dependency-aware system directed by the current coordinator, not a fully autonomous DAG executor. Sampled social posts do not establish platform-wide rankings.</text>
+  <rect x="48" y="1530" width="854" height="174" rx="18" fill="#f1ecff" stroke="#b5a3d6"/>
+  <text x="76" y="1568" class="heading">Model-strength memory</text>
+  <text x="76" y="1600" class="body">Reviewed checkpoints → per-model, per-task experience</text>
+  <text x="76" y="1630" class="body">Accepted work · rework · scope drift · time / token evidence</text>
+  <text x="76" y="1660" class="small">3 reviews before bounded ranking changes. New model versions start fresh.</text>
+  <rect x="932" y="1530" width="860" height="174" rx="18" fill="#e8efff" stroke="#9fb4ec"/>
+  <text x="960" y="1568" class="heading">Managed head: Claude ↔ Codex</text>
+  <text x="960" y="1600" class="body">Quota reached → save state → stop old head → switch</text>
+  <text x="960" y="1630" class="body">Both limited → wait without model calls → verify reset → resume</text>
+  <text x="960" y="1660" class="small">External DeltaRoute launcher; native app chats keep their original host.</text>
+  <text x="48" y="1740" class="small">Capabilities and permissions filter candidates first. Configured specialties are defaults; recorded reviews refine future routing.</text>
+</svg>

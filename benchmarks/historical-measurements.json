@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "sanitized historical measurements",
+  "measuredDate": "2026-10-17",
+  "platform": "Windows",
+  "scope": "Small nonrandomized fixtures on one subscription account setup. These are historical observations, not forecasts, universal model rankings, or reproducible public account access.",
+  "privacy": "Raw prompts, answers, account data, login state, logs, session IDs, task IDs and local paths are withheld. Only aggregate counters are included.",
+  "matchedLogTask": {
+    "fixture": "1200 synthetic JSONL rows; deterministic error-count answer",
+    "rawInputTokens": 89908,
+    "filteredInputTokens": 9489,
+    "bothAnswersCorrect": true,
+    "nativeCounterDefinition": "Claude logical input includes fresh input, cache writes and cache reads."
+  },
+  "localOutputFiltering": {
+    "sourceBytes": 201109,
+    "returnedBytes": 368,
+    "unit": "bytes, not model tokens"
+  },
+  "cacheObservations": {
+    "sameSessionContinuation": {"inputTokens": 92791, "cacheReadTokens": 89906, "cacheReadPercentRounded": 96.9},
+    "freshSessionRepeat": {"inputTokens": 89908, "cacheReadTokens": 2256, "cacheReadPercentRounded": 2.5},
+    "scope": "One repeated log fixture. Cached reads remain part of logical input; provider quota and billing treatment can differ."
+  },
+  "tinyTaskDelegation": {
+    "directCoordinatorInputTokens": 8955,
+    "routedCoordinatorInputTokens": 151109,
+    "workerUsageExcluded": true,
+    "scope": "One tiny supplied-code review per arm. Delegation overhead was substantial; this does not estimate long-workflow efficiency."
+  },
+  "historicalWorkerFixtures": [
+    {"provider": "codex", "inputTokens": 94924, "cacheReadTokens": 82304, "outputTokens": 546, "elapsedSeconds": 48.3},
+    {"provider": "gemini", "inputTokens": 11977, "cacheReadTokens": 0, "outputTokens": 841, "elapsedSeconds": 14.3},
+    {"provider": "cursor", "inputTokens": 26151, "cacheReadTokens": 5248, "outputTokens": 544, "elapsedSeconds": 110.7},
+    {"provider": "grok_via_cursor", "inputTokens": 26345, "cacheReadTokens": 5248, "outputTokens": 336, "elapsedSeconds": 141.7, "sourceGateObserved": true}
+  ],
+  "historicalWorkerCaveat": "Representative provider checks had different native counter schemas and startup conditions. The Grok row received a research sign-up gate before its validation fix, so it is not a successful research-quality result. Browser token usage was unavailable.",
+  "managedHeadMarkerFixture": {
+    "status": "completed",
+    "elapsedSeconds": 40.252,
+    "head": {"provider": "codex", "inputTokens": 141922, "cacheReadTokens": 122496, "outputTokens": 644},
+    "worker": {"provider": "gemini", "inputTokens": 18806, "cacheReadTokens": 0, "outputTokens": 142},
+    "originalCheckoutUnchanged": true,
+    "scope": "One read-only marker/checkpoint integration fixture; not a heavy-coding throughput benchmark."
+  },
+  "billingCaveats": [
+    "No reduction in a fixed subscription invoice was measured.",
+    "Logical input reduction, cached reads, quota consumption and API-equivalent estimates are different quantities.",
+    "No monthly savings, extra-chat allowance, reliability percentage or universal quality improvement is established.",
+    "Coordinator counters and worker counters must be reported separately and both counted when comparing delegated work."
+  ]
+}

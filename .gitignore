@@ -1,0 +1,52 @@
+# Local configuration and authentication
+config.json
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credentials*.json
+*cookies*.json
+*cookies*.txt
+.claude.json
+.codex/
+.claude/
+.gemini/
+
+# Prompt-bearing runtime state, logs, caches and worktrees
+/jobs/
+/workflows/
+/routing-memory/
+/coordinator-project-leases/
+coordinator-health.json
+coordinator-health.json.*
+coordinator-health.lock/
+/media-cache/
+/media-source-cache/
+/browser-state/
+/state/
+/work/
+/test-results/
+*.log
+*.raw.json
+*.raw.jsonl
+*.router-backup-*
+*.backup-*
+.lease-*/
+__pycache__/
+*.pyc
+
+# Provider binaries and dependency runtimes are installed separately
+node_modules/
+/vendor/
+/cursor-package/
+/antigravity/
+.venv/
+dist/
+*.zip
+*.exe
+*.dll
+# Optional upstream files have no declared redistribution license.
+/skill-library/remotion/
+.DS_Store
+Thumbs.db

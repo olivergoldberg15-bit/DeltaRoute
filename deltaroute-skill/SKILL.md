@@ -1,0 +1,20 @@
+---
+name: deltaroute
+description: Use DeltaRoute for subscription-based AI delegation, heavy coding/animation workflows, task-specific 3D guidance, token-efficiency audits, video URLs, or evidence-backed social-trend research. Keep small ordinary tasks local.
+---
+
+# DeltaRoute (Δ)
+
+DeltaRoute is the local multi-provider router. Use the current host (Codex or Claude Code) for planning, review and integration. Delegate independent bounded work when useful; preserve user permissions and the current project. Subscription allowances remain separate.
+
+For sustained coding, multi-step animation or large video work, read [heavy workflows](references/heavy-workflows.md). Save the original prompt and scoped dependency plan, use `submit_task` actions `create_workflow`, `run_step` and `checkpoint`, and resume from `get_task(workflow_id=...)`. Coordinator evidence checks gate downstream work; keep unrelated changes out. The same reference covers reviewed model-strength memory and the external managed Claude↔Codex head launcher. Native chats keep their host; only a managed run can automatically replace a stopped head.
+
+Before the first delegation, inspect `list_workers`; `recommend_route` accepts category and optional task text and returns model suggestions plus up to three specialist paths. `submit_task` starts work; `get_task` collects results and native counters. Use bounded waits when no independent work remains. On `needs_coordinator`, continue in this conversation using saved artifacts. A wait-for-shutdown handoff must be resolved before editing the same workspace. No recursive router/AI CLI calls from workers.
+
+For animation, 3D, realism, context/caching, evaluation and design, read [the installed skill catalog](references/catalog.md), then only the relevant source SKILL.md and references. DeltaRoute supplies small task-specific guidance to workers; it does not load the entire library. Upstream sample settings and claims are guidance, not evidence about installed versions, account quotas or current results. Existing required product/video workflows and user instructions take precedence.
+
+For TikTok/Instagram/video URLs, use category `video_analysis` with the original URL and question. The local watch engine extracts a bounded set of real frames and native captions; the Codex vision worker receives the images. Inspect frames yourself when working directly. State the sampled time range. Never infer visuals from captions or audio from silent images. No paid Gemini video API, cloud speech upload or automatic speech-model installation is configured.
+
+For real social trends, use category `social_research` and specify topic, country and date window where possible. Pass `research_scope: {topic, region, window_days}` to preserve these in the evidence assessment; unknown geography stays unverified. Gather original post URLs and native metadata. TikTok Creative Center can provide official trends when its public interface is available; otherwise describe a dated sample. Instagram's public connector may omit timestamps and engagement metrics: keep them unknown. DeltaRoute enriches up to four original video-post sources with available native metadata. Multiple recent creators with matching formats/sounds are candidate evidence, not proof of global popularity or growth. Watch representative clips before claiming what their content shows. No posting, following, messaging, paid scraping service or challenge bypass is authorized.
+
+For output quality, use fresh appropriate checks, citations and visual comparisons. Distinguish observed facts, inferences, unknowns and unavailable capabilities. Do not run extra models merely to obtain agreement. Renderer skills do not install Blender or guarantee photorealism. Report native input/output/cache counters separately; fixed subscriptions, estimated API-equivalent costs and quota consumption are different quantities. All browsing uses gstack /browse; context-mode is for local processing/indexing, not URL fetching.

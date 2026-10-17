@@ -1,0 +1,28 @@
+import {researchGate} from './browser.mjs';
+const number=(...values)=>{for(const v of values)if(typeof v==='number'&&Number.isFinite(v)&&v>=0)return v;return null;};
+export function classifyOutcome(job){const gate=job.provider==='perplexity'?researchGate({answer:job.answer||''}):job.provider==='grok'&&job.researchPacket?researchGate(job.researchPacket):null;const error=gate||job.researchError||job.error||'';if(/sign[ -]?in|sign[ -]?up|login|free allowance/i.test(error))return {state:job.provider==='grok'?'source_login_required':'login_required',availableNow:false,reason:error};if(/quota|rate.?limit/i.test(error))return {state:'quota_limited',availableNow:false,reason:error};return {state:job.status==='completed'?'last_run_succeeded':'last_run_'+job.status,availableNow:true,reason:error||null};}
+export function parseJsonOutput(text){try{return JSON.parse(text);}catch{}const rows=[];for(const line of String(text).split(/\r?\n/)){try{rows.push(JSON.parse(line));}catch{}}return rows;}
+export function normalizeClaude(record){const u=record?.usage||{};const fresh=number(u.input_tokens),read=number(u.cache_read_input_tokens),write=number(u.cache_creation_input_tokens),output=number(u.output_tokens);return {available:fresh!==null||output!==null,source:'Claude CLI reported counters',inputTokens:fresh===null?null:fresh+(read||0)+(write||0),freshInputTokens:fresh,cacheReadTokens:read,cacheWriteTokens:write,outputTokens:output,thinkingTokens:number(u.output_tokens_details?.thinking_tokens),apiEquivalentUSD:number(record?.total_cost_usd),raw:u};}
+export function parseWorkerUsage(provider,stdout,stderr=''){
+ const parsed=parseJsonOutput(stdout),rows=Array.isArray(parsed)?parsed:[parsed];let record,u;
+ if(provider==='codex'){record=rows.findLast(x=>x?.type==='turn.completed');u=record?.usage;if(u){const input=number(u.input_tokens),cached=number(u.cached_input_tokens);return {available:true,source:'Codex turn.completed',inputTokens:input,freshInputTokens:input===null||cached===null?null:Math.max(0,input-cached),cacheReadTokens:cached,cacheWriteTokens:number(u.cache_write_input_tokens),outputTokens:number(u.output_tokens),thinkingTokens:number(u.reasoning_output_tokens),apiEquivalentUSD:null,raw:u};}}
+ else {record=rows.findLast(x=>x?.usage||x?.token_usage||x?.tokenUsage);u=record?.usage||record?.token_usage||record?.tokenUsage;if(u){const input=number(u.input_tokens,u.inputTokens),cached=number(u.cache_read_tokens,u.cacheReadTokens,u.cache_read_input_tokens),written=number(u.cache_write_tokens,u.cacheWriteTokens),output=number(u.output_tokens,u.outputTokens);const cursorFresh=['cursor','grok'].includes(provider)&&typeof u.inputTokens==='number';if(input!==null||output!==null)return {available:true,source:provider+' CLI JSON',inputTokens:cursorFresh?input+(cached||0)+(written||0):input,freshInputTokens:cursorFresh?input:input===null||cached===null?null:Math.max(0,input-cached),cacheReadTokens:cached,cacheWriteTokens:written,outputTokens:output,thinkingTokens:number(u.thinking_tokens,u.thinkingTokens),apiEquivalentUSD:number(record.total_cost_usd),raw:u};}}
+ const legacy=stderr.match(/tokens used\s*\r?\n([\d,]+)/i);
+ return {available:false,source:legacy?'CLI reported an undifferentiated total only':'Provider did not expose token counters',inputTokens:null,freshInputTokens:null,cacheReadTokens:null,cacheWriteTokens:null,outputTokens:null,thinkingTokens:null,apiEquivalentUSD:null,...(legacy?{legacyReportedTokens:Number(legacy[1].replaceAll(',',''))}:{})};
+}
+export function compactJob(job,root,maxAnswer=6000){
+ const result={};for(const k of ['id','provider','requestedProvider','collectionMethod','citationProvenance','terminationConfirmed','category','mode','status','phase','modelUsed','startedAt','finishedAt','worktree','branch','exitCode','error','tokenUsage','authentication'])if(job[k]!==undefined)result[k]=job[k];
+ if(job.sourceValidation||job.researchPacket?.sourceValidation)result.sourceValidation=job.sourceValidation||job.researchPacket.sourceValidation;
+   if(result.tokenUsage){const {raw,...summary}=result.tokenUsage;result.tokenUsage=summary;}
+ if(job.specialistSkills)result.specialistSkills=job.specialistSkills;
+ if(job.mediaEvidence){const {reportExcerpt,...media}=job.mediaEvidence;result.mediaEvidence=media;}
+ if(job.workflowRef)result.workflowRef=job.workflowRef;if(job.scopeAudit){const audit=job.scopeAudit;result.scopeAudit={...audit,changedPaths:audit.changedPaths?.slice(0,40),outside:audit.outside?.slice(0,20),changedPathCount:audit.changedPaths?.length||0,outsidePathCount:audit.outside?.length||0,pathsTruncated:(audit.changedPaths?.length||0)>40||(audit.outside?.length||0)>20};}if(job.limits)result.limits=job.limits;
+ if(job.handoff)result.handoff=job.handoff;
+ if(job.attempts)result.attempts=job.attempts.map(a=>({taskId:a.taskId,provider:a.provider,status:a.status,error:a.error,failureKind:a.failure?.kind,worktree:a.worktree}));
+ result.artifacts={status:root.replaceAll('\\','/')+'/jobs/'+job.id+'/status.json'};
+ if(job.childPid||job.resultTaskId){const dir=root.replaceAll('\\','/')+'/jobs/'+(job.resultTaskId||job.id);result.artifacts.answer=dir+'/answer.txt';result.artifacts.rawOutput=dir+'/stdout.log';}
+ if(job.answer!==undefined){result.answer=String(job.answer).slice(0,maxAnswer);if(String(job.answer).length>maxAnswer)result.answerTruncated=true;}
+ if(job.sources)result.sources=job.sources.slice(0,12);if(job.researchPacket)result.researchSources=job.researchPacket.sources?.slice(0,12)||[];if(job.researchError)result.researchError=job.researchError;
+ return result;
+}
+export function boundedWait(value,fallback=0){const n=Number(value);return Number.isFinite(n)?Math.min(45,Math.max(0,n)):fallback;}

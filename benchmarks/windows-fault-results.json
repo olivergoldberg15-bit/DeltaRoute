@@ -1,0 +1,59 @@
+{
+  "createdAt": "2026-10-17T19:04:52.046Z",
+  "scope": "Actual isolated router/process/Git tests using locally compiled fake provider executables. No real model, account, network, API, or subscription calls.",
+  "checks": [
+    {
+      "name": "expired login falls back to Gemini without model call on Codex",
+      "passed": true,
+      "elapsedMs": 6229
+    },
+    {
+      "name": "outage recovers and counts failed plus successful native usage once",
+      "passed": true,
+      "elapsedMs": 7801
+    },
+    {
+      "name": "hard quota moves to another subscription",
+      "passed": true,
+      "elapsedMs": 4974
+    },
+    {
+      "name": "code fallback uses a fresh worktree and preserves original checkout",
+      "passed": true,
+      "elapsedMs": 5708
+    },
+    {
+      "name": "cancellation stops active child and never launches fallback",
+      "passed": true,
+      "elapsedMs": 8292
+    },
+    {
+      "name": "whole-attempt timeout includes a hung login probe and falls back",
+      "passed": true,
+      "elapsedMs": 6939
+    },
+    {
+      "name": "timed out model retains partial native token usage before fallback",
+      "passed": true,
+      "elapsedMs": 6802
+    },
+    {
+      "name": "all provider quotas exhausted yields an honest coordinator handoff",
+      "passed": true,
+      "elapsedMs": 3398
+    },
+    {
+      "name": "workflow preserves scoped assignment and gates dependencies until reviewed",
+      "passed": true,
+      "elapsedMs": 9268
+    },
+    {
+      "name": "workflow rejects code scope drift without a permissive fallback",
+      "passed": true,
+      "elapsedMs": 7441
+    }
+  ],
+  "passed": 10,
+  "failed": 0,
+  "finishedAt": "2026-10-17T19:05:58.909Z"
+}
