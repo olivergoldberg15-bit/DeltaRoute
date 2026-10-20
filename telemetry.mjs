@@ -11,7 +11,7 @@ export function parseWorkerUsage(provider,stdout,stderr=''){
  return {available:false,source:legacy?'CLI reported an undifferentiated total only':'Provider did not expose token counters',inputTokens:null,freshInputTokens:null,cacheReadTokens:null,cacheWriteTokens:null,outputTokens:null,thinkingTokens:null,apiEquivalentUSD:null,...(legacy?{legacyReportedTokens:Number(legacy[1].replaceAll(',',''))}:{})};
 }
 export function compactJob(job,root,maxAnswer=6000){
- const result={};for(const k of ['id','provider','requestedProvider','collectionMethod','citationProvenance','terminationConfirmed','category','mode','status','phase','modelUsed','startedAt','finishedAt','worktree','branch','exitCode','error','tokenUsage','authentication'])if(job[k]!==undefined)result[k]=job[k];
+ const result={};for(const k of ['id','provider','requestedProvider','collectionMethod','citationProvenance','terminationConfirmed','category','mode','status','phase','modelUsed','startedAt','finishedAt','worktree','branch','exitCode','error','tokenUsage','authentication','selfCheck'])if(job[k]!==undefined)result[k]=job[k];
  if(job.sourceValidation||job.researchPacket?.sourceValidation)result.sourceValidation=job.sourceValidation||job.researchPacket.sourceValidation;
    if(result.tokenUsage){const {raw,...summary}=result.tokenUsage;result.tokenUsage=summary;}
  if(job.specialistSkills)result.specialistSkills=job.specialistSkills;
