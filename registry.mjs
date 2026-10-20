@@ -162,7 +162,7 @@ export function applyProposal(root, id, {approvedByUser, additions = []} = {}) {
   local.updatedAt = new Date().toISOString().slice(0, 10);
   atomicWriteJSON(localFile(root), local);
   atomicWriteJSON(file, {...proposal, status: 'applied', appliedAt: new Date().toISOString(), approvedByUser: approvedByUser.trim().slice(0, 500)});
-  return {applied: proposal.items.length + additions.length, registry: registryAge(loadRegistry(root))};
+  return {changed: proposal.items.filter(i => i.kind === 'change').length, added: additions.map(m => m.id), registry: registryAge(loadRegistry(root))};
 }
 
 /** Record live model lists without touching scores. Only a refresh with nothing to approve clears the stale warning. */

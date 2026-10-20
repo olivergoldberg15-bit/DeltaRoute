@@ -87,3 +87,9 @@ test('Codex refuses to replace a differently registered server and preserves ori
   const cfg=file(path.join(temporary(t),'config.toml'),'[mcp_servers.deltaroute]\ncommand = "other"\nargs = ["other.mjs"]\n');
   const before=fs.readFileSync(cfg),result=helper(cfg);assert.notEqual(result.status,0);assert.deepEqual(fs.readFileSync(cfg),before);
 });
+
+test('Grok uses the user\'s own grok.com account through the research browser when gstack exists',t=>{
+  const root=temporary(t),browser=file(path.join(root,'browse.exe'));
+  const config=buildConfig({browser},{root});
+  assert.equal(config.workers.grok.transport,'browser');assert.equal(config.workers.grok.enabled,true);assert.equal(config.workers.grok.command,'');
+});

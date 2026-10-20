@@ -55,7 +55,16 @@
       "label": "Perplexity (browser, via gstack)",
       "tier": "mid",
       "scores": {"planning": 20, "coding": 10, "review": 20, "research": 85, "visual": 10, "large_context": 40, "speed": 50, "cost_efficiency": 85},
-      "source": "Research only. On this machine Google's robot check blocks its source search (likely VPN IP)."
+      "source": "Research only. Oliver is on Perplexity's basic (free) tier, so Pro searches run out. Its Google primary-source fallback hits a robot check on this machine (likely VPN IP)."
+    },
+    {
+      "id": "grok-web",
+      "provider": "grok",
+      "model": null,
+      "label": "Grok (SuperGrok on grok.com, via gstack)",
+      "tier": "mid",
+      "scores": {"planning": 25, "coding": 15, "review": 25, "research": 88, "visual": 10, "large_context": 45, "speed": 50, "cost_efficiency": 85},
+      "source": "Research only, on Oliver's paid SuperGrok account (2026-10-19), ranked above basic-tier Perplexity. Native live X access is not verified. Needs a one-time sign-in with research-login.ps1 grok."
     },
     {
       "id": "claude-haiku-native",

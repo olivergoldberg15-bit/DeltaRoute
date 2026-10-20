@@ -45,11 +45,12 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   }catch(e){row={worker:name,verdict:'FAIL',reason:e.message};}
   row.seconds=Math.round((Date.now()-started)/1000);results.push(row);console.log(row.verdict.padEnd(8),name.padEnd(11),row.seconds+'s',' '+row.reason);
  }
- if(process.argv.includes('--research')&&cfg.workers.perplexity?.enabled){
+ const researchers=process.argv.includes('--research')?['perplexity','grok'].filter(n=>cfg.workers[n]?.enabled&&cfg.workers[n].transport==='browser'&&(!only||only.includes(n))):[];
+ for(const name of researchers){
   const started=Date.now();let row;
-  try{const submitted=call('submit_task',{task:'In what year was the Eiffel Tower completed? Answer with the year and one source.',provider:'perplexity',fallback:false,category:'research'});row={worker:'perplexity',...researchVerdict(waitFor(submitted.id||submitted.task_id))};}
-  catch(e){row={worker:'perplexity',verdict:'FAIL',reason:e.message};}
-  row.seconds=Math.round((Date.now()-started)/1000);results.push(row);console.log(row.verdict.padEnd(8),'perplexity'.padEnd(11),row.seconds+'s',' '+row.reason);
+  try{const submitted=call('submit_task',{task:'In what year was the Eiffel Tower completed? Answer with the year and one source.',provider:name,fallback:false,category:'research'});row={worker:name,...researchVerdict(waitFor(submitted.id||submitted.task_id))};}
+  catch(e){row={worker:name,verdict:'FAIL',reason:e.message};}
+  row.seconds=Math.round((Date.now()-started)/1000);results.push(row);console.log(row.verdict.padEnd(8),name.padEnd(11),row.seconds+'s',' '+row.reason);
  }
  const summary={ranAt:new Date().toISOString(),results};fs.mkdirSync(path.join(ROOT,'state'),{recursive:true});fs.writeFileSync(path.join(ROOT,'state','smoke-last.json'),JSON.stringify(summary,null,1));
  if(!results.length)console.log('No enabled workers matched.');

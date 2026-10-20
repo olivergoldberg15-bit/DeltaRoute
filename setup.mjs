@@ -77,7 +77,9 @@ export function buildConfig(found,{root=ROOT,template=JSON.parse(fs.readFileSync
   workers.gemini.reason='CLI discovery does not verify account login, subscription entitlement, model availability or quota.';
   workers.cursor.command=found.cursor||'';workers.cursor.enabled=!!found.cursor;
   workers.cursor.reason=found.cursor?'Installed Cursor CLI detected; authenticate separately.':'No supported native Cursor Agent executable found. Install it separately or configure its Node entry point explicitly.';
-  workers.grok.command=found.cursor||'';workers.grok.enabled=false;
+  // Grok runs on the user's own grok.com subscription through the research browser; Cursor is only the fallback transport.
+  if(found.browser){workers.grok.transport='browser';workers.grok.command='';workers.grok.enabled=true;workers.grok.reason='gstack detected; sign into your grok.com account with research-login.ps1 grok before use. Native live X access is not verified.';}
+  else{workers.grok.command=found.cursor||'';workers.grok.enabled=false;}
   workers.perplexity.enabled=!!found.browser;
   workers.perplexity.reason=found.browser?'gstack detected; sign into your existing account with research-login.ps1 before use.':'Install gstack separately for browser research; no paid research API fallback is configured.';
   config.coordinators={claude:{command:found.claude||''},codex:{command:found.codex||''}};
