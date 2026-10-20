@@ -16,7 +16,8 @@ function call(tool,args){const r=spawnSync(process.execPath,[path.join(ROOT,'ser
 function waitFor(id){const until=Date.now()+deadlineSeconds*1000;let job=call('get_task',{task_id:id,detail:'full'});while(['queued','running'].includes(job.status)&&Date.now()<until)job=call('get_task',{task_id:id,wait_seconds:45,detail:'full'});return job;}
 
 export function codeVerdict(job,readFile){
- if(job.status!=='completed')return {verdict:'FAIL',reason:job.error||job.status};
+ // The orchestrator's error is a generic hand-back message; the attempt holds the real reason.
+ if(job.status!=='completed')return {verdict:'FAIL',reason:job.attempts?.at(-1)?.error||job.error||job.status};
  const winner=(job.attempts||[]).findLast(a=>a.status==='completed');const file=winner?.worktree&&path.join(winner.worktree,'SMOKE.txt');
  const text=file?readFile(file):null;
  if(text==null)return {verdict:'FAIL',reason:'reported completed but SMOKE.txt was not written'};
@@ -24,7 +25,8 @@ export function codeVerdict(job,readFile){
 }
 export function researchVerdict(job){
  if(job.status==='completed')return /1889/.test(job.answer||'')?{verdict:'PASS',reason:'answered with a source'}:{verdict:'FAIL',reason:'completed without the expected fact'};
- const error=job.error||job.attempts?.at(-1)?.error||job.status;
+ const error=job.attempts?.at(-1)?.error||job.error||job.status;
+ if(/requires browser sign-in/i.test(error))return {verdict:'SIGN-IN',reason:error};
  return /browser challenge|robot check/i.test(error)?{verdict:'BLOCKED',reason:error}:{verdict:'FAIL',reason:error};
 }
 

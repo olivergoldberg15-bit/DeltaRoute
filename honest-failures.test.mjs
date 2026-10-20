@@ -50,3 +50,15 @@ test('smoke verdict only passes when the worker really wrote the file',()=>{
  assert.equal(researchVerdict({status:'needs_coordinator',error:SEARCH_BOT_CHECK}).verdict,'BLOCKED');
  assert.equal(researchVerdict({status:'completed',answer:'Completed in 1889.'}).verdict,'PASS');
 });
+
+test('when research falls back and the fallback fails too, both reasons are kept',async()=>{
+ const {collectResearchEvidence}=await import('./research-quality.mjs');
+ await assert.rejects(collectResearchEvidence('Research the question and cite sources',async()=>{throw Error('Provider requires browser sign-in or has exhausted its free allowance');},async()=>{throw Error(SEARCH_BOT_CHECK);}),
+  e=>/failed first: Provider requires browser sign-in.*Then: Primary search browser challenge/s.test(e.message)&&classifyFailure(e.message).kind==='challenge');
+});
+
+test('smoke shows the attempt\'s real reason and flags a needed sign-in',()=>{
+ const wrapped={status:'needs_coordinator',error:'Eligible external providers unavailable',attempts:[{status:'failed',error:'Research provider failed first: Provider requires browser sign-in or has exhausted its free allowance Then: '+SEARCH_BOT_CHECK}]};
+ const v=researchVerdict(wrapped);assert.equal(v.verdict,'SIGN-IN');assert.match(v.reason,/requires browser sign-in/);
+ assert.match(codeVerdict({status:'needs_coordinator',error:'Eligible external providers unavailable',attempts:[{status:'failed',error:'No changes: nothing written'}]},()=>null).reason,/^No changes/);
+});

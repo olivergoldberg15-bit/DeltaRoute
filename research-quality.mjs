@@ -8,14 +8,15 @@ export function primaryDomains(prompt){
 }
 export function missingPrimarySources(packet,domains){const urls=[...(packet.sources||[]).map(s=>s.url),...(String(packet.answer||'').match(/https?:\/\/[^\s<>"')]+/g)||[])];return domains.filter(d=>!urls.some(u=>{try{const h=new URL(u).hostname;return h===d||h.endsWith('.'+d);}catch{return false;}}));}
 export async function collectResearchEvidence(prompt,fetchPacket,fallback=null){
- const domains=primaryDomains(prompt),requiresCitations=domains.length>0||/\b(cite|sources?|research|current|social|search)\b/i.test(prompt);let packet,attempts=0,recoveryReason=null;
+ const domains=primaryDomains(prompt),requiresCitations=domains.length>0||/\b(cite|sources?|research|current|social|search)\b/i.test(prompt);let packet,attempts=0,recoveryReason=null,providerError=null;
  const missing=p=>{const m=missingPrimarySources(p,domains);if(requiresCitations&&!m.length&&!hasUsableSource(p))m.push('at least one usable original source URL');return m;};
  for(let attempt=0;attempt<2;attempt++){
   const followup=attempt?'\n\nSOURCE REPAIR: The previous result missed required primary sources: '+missingPrimarySources(packet,domains).join(', ')+'. Follow the original links and return their full direct URLs, exact dates, and verified facts. Do not substitute a secondary summary. Candidate pages from the previous result: '+JSON.stringify((packet.sources||[]).slice(0,5))+'. Previous answer: '+String(packet.answer||'').slice(0,1200):'';
-  attempts++;try{packet=await fetchPacket(prompt+followup);}catch(e){const failure=classifyFailure(e.message);if(!fallback||!failure.fallbackEligible)throw e;recoveryReason=failure.kind;break;}const absent=missing(packet);
+  attempts++;try{packet=await fetchPacket(prompt+followup);}catch(e){const failure=classifyFailure(e.message);if(!fallback||!failure.fallbackEligible)throw e;recoveryReason=failure.kind;providerError=e.message;break;}const absent=missing(packet);
   if(!absent.length)return {...packet,sourceValidation:{attempts,requiredDomains:domains,passed:true}};
  }
- if(fallback){const direct=await fallback(domains);if(!missing(direct).length)return {...direct,sourceValidation:{attempts:attempts+1,requiredDomains:domains,passed:true,fallback:'gstack-primary-search',recoveryReason}};}
+ // Keep the provider's own reason when the fallback also fails, or the first failure is lost.
+ if(fallback){let direct;try{direct=await fallback(domains);}catch(e){throw Error(providerError?'Research provider failed first: '+providerError+' Then: '+e.message:e.message);}if(!missing(direct).length)return {...direct,sourceValidation:{attempts:attempts+1,requiredDomains:domains,passed:true,fallback:'gstack-primary-search',recoveryReason}};}
  throw Error('Required primary sources missing after 2 source-collection attempts: '+(packet?missing(packet):['source provider unavailable']).join(', ')+'. No downstream analysis launched.');
 }
 export function sourceCollectionPrompt(task){
