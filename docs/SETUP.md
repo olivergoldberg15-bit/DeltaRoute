@@ -21,7 +21,7 @@ AGENTS block and the native DeltaRoute skill. Optional context-mode is reused
 only if already installed; DeltaRoute does not silently install a new service.
 
 The Claude registration retains the compatibility name `subscription-router`;
-the Codex registration is `deltaroute`. They expose the same five tools.
+the Codex registration is `deltaroute`. They expose the same six tools.
 Installers preserve unrelated global configuration and create backups. An
 existing registration pointing elsewhere is refused, rather than overwritten.
 For an older installation, review and deliberately remove/migrate that specific

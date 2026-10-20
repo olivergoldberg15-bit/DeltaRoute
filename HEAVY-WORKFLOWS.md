@@ -1,6 +1,8 @@
 # DeltaRoute heavy workflows, model memory and head failover
 
-Updated October 17, 2026. The workflow chart is [PNG](docs/deltaroute-routing.png), [SVG](docs/deltaroute-routing.svg) or [editable Mermaid](docs/deltaroute-routing.mmd).
+Updated October 19, 2026 (v1.6): workflows are now Operation Plans with a user plan check, routes with token/run budgets, agents and sub-agents, a log self-check, a scored Review (80 passes), a simulated review of the whole product, Chief's final review and the user's approval, streamed to a live dashboard. The step-by-step instructions are in [deltaroute-skill/references/heavy-workflows.md](deltaroute-skill/references/heavy-workflows.md).
+
+Previously updated October 17, 2026. The workflow chart is [PNG](docs/deltaroute-routing.png), [SVG](docs/deltaroute-routing.svg) or [editable Mermaid](docs/deltaroute-routing.mmd).
 
 DeltaRoute now keeps a saved contract containing the original prompt, objective, constraints, non-goals, acceptance checks and task dependencies. Heavy work is divided into bounded steps. A completed worker result waits for coordinator review; downstream steps remain blocked until the coordinator records actual evidence. Coding and coding-review steps use isolated worktrees pinned to a checked commit, including all accepted code prerequisites. Changed Git paths are audited against the step's allowed files/directories. This catches file-scope drift; semantic correctness and visual quality still require review.
 

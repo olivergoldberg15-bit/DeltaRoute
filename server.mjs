@@ -240,7 +240,7 @@ async function serve(){
  const lines=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
  for await(const line of lines){let msg;try{msg=JSON.parse(line);}catch{continue;}if(msg.id===undefined)continue;
   let result,error;try{
-   if(msg.method==='initialize')result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'DeltaRoute',title:'DeltaRoute (Δ)',version:'1.5.0'}};
+   if(msg.method==='initialize')result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'DeltaRoute',title:'DeltaRoute (Δ)',version:'1.6.0'}};
    else if(msg.method==='ping')result={};
    else if(msg.method==='tools/list')result={tools};
    else if(msg.method==='tools/call'){try{result={content:[{type:'text',text:JSON.stringify(await call(msg.params.name,msg.params.arguments),null,2)}]};}catch(e){result={isError:true,content:[{type:'text',text:e.message}]};}}

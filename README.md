@@ -1,6 +1,6 @@
 # DeltaRoute (Δ)
 
-DeltaRoute coordinates local AI subscription clients from **Claude Code or Codex**. Your current host plans and reviews; bounded workers handle suitable tasks through their own signed-in clients. Saved workflow contracts, evidence checkpoints and reviewed model memory keep long jobs tied to the original prompt.
+DeltaRoute coordinates local AI subscription clients from **Claude Code or Codex**. Your current host plans and reviews; bounded workers handle suitable tasks through their own signed-in clients. Long jobs run as an Operation Plan the user approves first: routes with token budgets, agents and cheap sub-agents, a 0-100 Review (80 passes), a simulated review of the whole product and the user's final approval, all streamed to a live local dashboard. A capability registry gives each role to the best available model. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ![DeltaRoute routing workflow](docs/deltaroute-routing.png)
 
@@ -31,7 +31,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install-codex.ps1 -Managed
 powershell -NoProfile -ExecutionPolicy Bypass -File .\doctor.ps1
 ```
 
-The switches opt into approval for the five local router tools. They do not grant blanket shell/browser permissions or override explicit Codex denials. Without the switches, worker submission/cancellation use normal approvals; the Codex installer may approve its read-only router tools. Installers back up changed global files and refuse to overwrite an unrelated existing MCP registration. Keep this checkout at its installed path and restart the host to load changes.
+The switches opt into approval for the six local router tools. They do not grant blanket shell/browser permissions or override explicit Codex denials. Without the switches, worker submission/cancellation use normal approvals; the Codex installer may approve its read-only router tools. Installers back up changed global files and refuse to overwrite an unrelated existing MCP registration. Keep this checkout at its installed path and restart the host to load changes.
 
 See [setup and providers](docs/SETUP.md) for prerequisites, sign-in, research, video tools, optional skills, manual MCP setup and troubleshooting.
 
@@ -90,7 +90,7 @@ One historical matched log experiment reduced Claude logical input from 89,908 t
 
 ## Project files
 
-- `server.mjs`: five MCP tools and bounded worker adapters.
+- `server.mjs`: six MCP tools and bounded worker adapters.
 - `workflows.mjs`: original contract, dependency gates and scope audits.
 - `coordinator-supervisor.mjs`: external managed-head lifecycle.
 - `coordinator-state.mjs`, `account-limits.mjs`: observed quota state and native readiness.

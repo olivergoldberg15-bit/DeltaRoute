@@ -5,7 +5,8 @@
       "mcp__subscription-router__recommend_route",
       "mcp__subscription-router__submit_task",
       "mcp__subscription-router__get_task",
-      "mcp__subscription-router__cancel_task"
+      "mcp__subscription-router__cancel_task",
+      "mcp__subscription-router__model_registry"
     ]
   }
 }

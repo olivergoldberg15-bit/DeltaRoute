@@ -1,34 +1,34 @@
 # Architecture and workflow
 
-The host receives the prompt and applies a small routing policy. A Claude prompt
-hook repeats the policy without storing the prompt. Codex receives a marked
-global instruction block and native skill. Workers have scoped briefs and a
-recursion guard; the host remains responsible for the final answer.
+The host conversation is Chief. It receives the prompt, plans, reviews and integrates. A
+Claude prompt hook repeats a short policy without storing the prompt. Workers get scoped briefs
+that point at the saved contract, and a recursion guard; the host remains responsible for the
+final answer. Every role below Chief goes to the best available model in the capability
+registry (`models.json`), whose tier allows it.
 
 ```mermaid
 flowchart TD
-  U[Your prompt] --> H[Current Claude Code or Codex host]
-  H --> S{Small self-contained task?}
-  S -->|yes| L[Answer or implement locally]
-  S -->|independent work useful| C[Save original contract and step dependencies]
-  C --> R[Check capabilities, availability and reviewed model fit]
-  R --> X[Codex: coding, tests, review]
-  R --> G[Gemini: quick iteration and large context]
-  R --> I[Cursor: integration and frontend]
-  R --> P[gstack and Perplexity: original research sources]
-  P --> K[Grok through Cursor: source analysis]
-  R --> V[Local video frames then vision-capable Codex]
-  R --> N[Native lower-model repetitive subagent]
-  X & G & I & K & V & N --> E[Artifacts, counters and fresh checks]
-  E --> Q[Coordinator reviews original scope and evidence]
-  Q -->|accepted| A[Integrate, checkpoint and release dependencies]
-  Q -->|rework budget remains| R
-  A --> F{More steps?}
-  F -->|yes| R
-  F -->|no| Z[Final reviewed result]
+  U[User prompt] --> C[Chief: host model, final review]
+  C --> OP[OP: Operation Plan, routes and team size]
+  P[(Prompt + plan contract)] -.context rail, pulled on demand.-> OP
+  OP -->|plan check| U2{User approves plan?}
+  U2 -->|yes| R2[Route lead: own loop and token/run budget]
+  U2 -->|yes| R3[Route lead: own loop and token/run budget]
+  R2 --> A4[Agent] & A5[Agent]
+  R3 --> A7[Research agent] & A8[Agent]
+  A4 --> S1[Sub-agents: cheapest tier, read-only]
+  A4 & A5 & A7 & A8 --> L[Log self-check: answer and log tails]
+  L --> RV{Review: score 0-100 vs plan}
+  RV -->|below 80, notes only| R2
+  RV -->|below 80, notes only| R3
+  RV -->|80+ on every step| SIM{Simulated review of whole product}
+  SIM -->|below 80: reopen steps| R2
+  SIM -->|80+, with real frames for visual work| CF[Chief final review]
+  CF --> H[User approves the result]
+  OP & R2 & R3 & RV & SIM & CF -.every step.-> D[(events.jsonl + live dashboard.html)]
 ```
 
-## The five MCP tools
+## The six MCP tools
 
 | Tool | Purpose |
 |---|---|
@@ -37,6 +37,7 @@ flowchart TD
 | `submit_task` | Delegate or create/run/checkpoint a persistent workflow |
 | `get_task` | Read compact results or saved workflow status; optional bounded wait |
 | `cancel_task` | Stop a job and its children while retaining evidence |
+| `model_registry` | Role assignment from capability scores; refresh live model lists into proposals that only the user's quoted approval applies |
 
 Transport is line-delimited JSON-RPC over stdio. `node server.mjs --call
 list_workers '{}'` is a local diagnostic interface. The server has no public
@@ -59,6 +60,36 @@ record evidence for each acceptance criterion. Accepted code must be integrated,
 checked and committed in a clean project checkout. Downstream launch validates
 all transitive accepted code prerequisites. A coordinator-completed recovery is
 recorded separately and does not give quality credit to the failed worker.
+
+## Operation Plan, budgets and review
+
+`create_workflow` saves an Operation Plan: routes (each with a lead and a budget), steps (one agent
+each, optionally naming a provider and registry model) and up to six read-only sub-agents per step.
+New plans wait for `approve_plan`, which records the user's own words. A route's budget counts
+fresh input plus output tokens (cached reads are reported but not budgeted) with a run count as the
+backup, so workers that report no tokens are still bounded. When a route runs out it stops and lists
+what went wrong.
+
+Each finished attempt gets a log self-check: an empty answer or an admitted failure blocks
+acceptance until the reviewer explains the resolution; tracebacks, crashes and test failures in the
+logs are warnings. Review scores each step 0-100 against the approved plan; 80 passes and anything
+lower goes back to that step with only the reviewer's notes and score. Once every step passes,
+`simulated_review` judges the whole product from evidence of what was actually run. Visual work
+needs real frame or screenshot files to pass, because workers never see their renders. A failing
+simulated review reopens the named steps and everything built on them. `final_review` records
+Chief's note and then the user's approval; only then is the workflow done.
+
+Every change is appended to `workflows/<id>/events.jsonl` and redrawn into
+`workflows/<id>/dashboard.html`, a static page that refreshes itself every few seconds until the
+run is done. There is no server and nothing opens a window. Token counts there cover workers only;
+the host's own tokens as Chief and reviewer are not measured.
+
+## Honest failures and the smoke test
+
+A code job that changes no files counts as failed and falls back to the next provider. A dirty
+checkout is refused before a job exists, so it never uses up a step's try. Google's robot check is
+reported as a bot check. `npm run smoke` launches each enabled code worker on a tiny job and
+confirms a file changed; unit tests never launch a worker.
 
 ## Worker fallback and managed heads
 

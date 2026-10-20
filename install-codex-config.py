@@ -28,7 +28,7 @@ def configure(node, config_path, context_start=None, check=False, managed_heads=
     if check:
         return json.dumps({name: bool(servers.get(name)) for name in ['deltaroute', 'deltaroute-context']})
     allowed_tools = {
-        'deltaroute': ['list_workers', 'recommend_route', 'submit_task', 'get_task', 'cancel_task'],
+        'deltaroute': ['list_workers', 'recommend_route', 'submit_task', 'get_task', 'cancel_task', 'model_registry'],
         'deltaroute-context': ['ctx_execute', 'ctx_execute_file', 'ctx_batch_execute', 'ctx_index', 'ctx_search', 'ctx_stats', 'ctx_doctor'],
     }
     for name in expected:
@@ -62,7 +62,7 @@ def configure(node, config_path, context_start=None, check=False, managed_heads=
             continue
         read_tools = ['list_workers', 'recommend_route', 'get_task'] if name == 'deltaroute' else ['ctx_stats', 'ctx_doctor']
         if name == 'deltaroute' and managed_heads:
-            read_tools += ['submit_task', 'cancel_task']
+            read_tools += ['submit_task', 'cancel_task', 'model_registry']
         for tool in read_tools:
             if tool in restricted and tool not in server.get('disabled_tools', []) and tool not in server.get('tools', {}):
                 text += '\n[mcp_servers.' + name + '.tools.' + tool + ']\napproval_mode = "approve"\n'

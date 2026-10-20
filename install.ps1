@@ -51,7 +51,7 @@ $entry=[pscustomobject]@{hooks=@([pscustomobject]@{type='command';command=$hookC
 $settings.hooks | Add-Member -NotePropertyName UserPromptSubmit -NotePropertyValue (@($prior)+@($entry)) -Force
 if($AllowRouterTools){
   if(-not $settings.permissions){$settings | Add-Member -NotePropertyName permissions -NotePropertyValue ([pscustomobject]@{}) -Force}
-  $routerTools=@('list_workers','recommend_route','submit_task','get_task','cancel_task') | ForEach-Object {'mcp__subscription-router__'+$_}
+  $routerTools=@('list_workers','recommend_route','submit_task','get_task','cancel_task','model_registry') | ForEach-Object {'mcp__subscription-router__'+$_}
   $allowed=@($settings.permissions.allow | Where-Object {$_})+@($routerTools)
   $settings.permissions | Add-Member -NotePropertyName allow -NotePropertyValue @($allowed | Select-Object -Unique) -Force
 }
