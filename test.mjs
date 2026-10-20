@@ -33,5 +33,5 @@ test('MCP initialization, discovery and tool errors work over real stdio',async(
  const requests=[{id:1,method:'initialize',params:{protocolVersion:'2024-11-05'}},{id:2,method:'tools/list'},{id:3,method:'tools/call',params:{name:'get_task',arguments:{task_id:'../../secret'}}},{id:4,method:'tools/call',params:{name:'submit_task',arguments:{task:'Implement retention for the last 365 days',cwd:runtime,mode:'bad'}}}];
  p.stdin.end(requests.map(r=>JSON.stringify({jsonrpc:'2.0',...r})).join('\n')+'\n');
  const code=await new Promise((resolve,reject)=>{p.on('error',reject);p.on('close',resolve);});assert.equal(code,0,stderr);
- const responses=output.trim().split('\n').map(JSON.parse);assert.equal(responses.length,4);assert.equal(responses[0].result.serverInfo.name,'DeltaRoute');assert.equal(responses[1].result.tools.length,5);assert.equal(responses[2].result.isError,true);assert.equal(responses[3].result.isError,true);assert.match(JSON.stringify(responses[3]),/Invalid mode/);
+ const responses=output.trim().split('\n').map(JSON.parse);assert.equal(responses.length,4);assert.equal(responses[0].result.serverInfo.name,'DeltaRoute');assert.equal(responses[1].result.tools.length,6);assert.equal(responses[2].result.isError,true);assert.equal(responses[3].result.isError,true);assert.match(JSON.stringify(responses[3]),/Invalid mode/);
 });

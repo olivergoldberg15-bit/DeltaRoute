@@ -1,0 +1,70 @@
+{
+  "updatedAt": "2026-10-19",
+  "note": "Editorial capability scores (0-100), not measured benchmarks. Only an approved refresh proposal or a coordinator review changes them. Tier caps which roles a model may hold.",
+  "capabilities": ["planning", "coding", "review", "research", "visual", "large_context", "speed", "cost_efficiency"],
+  "models": [
+    {
+      "id": "claude-opus-5-5",
+      "provider": "claude",
+      "model": "claude-opus-5-5",
+      "label": "Claude Opus 5.5",
+      "tier": "top",
+      "scores": {"planning": 95, "coding": 90, "review": 93, "research": 60, "visual": 75, "large_context": 90, "speed": 55, "cost_efficiency": 20},
+      "source": "Coordinator on the Les Mis film: found every visual bug by viewing frames. Uses Oliver's Claude Pro limit, the scarcest budget, hence low cost_efficiency."
+    },
+    {
+      "id": "codex-default",
+      "provider": "codex",
+      "model": null,
+      "label": "Codex (ChatGPT plan, account default model)",
+      "tier": "top",
+      "scores": {"planning": 82, "coding": 90, "review": 85, "research": 35, "visual": 40, "large_context": 75, "speed": 45, "cost_efficiency": 85},
+      "source": "Les Mis film: 20 of 26 finished jobs, wrote most of the Blender code; cannot see renders; 650K-800K input tokens per job. Runs on ChatGPT, not the Claude limit."
+    },
+    {
+      "id": "gemini-4-argon-high",
+      "provider": "gemini",
+      "model": "gemini-4-argon-high",
+      "label": "Gemini 4 Argon (High)",
+      "tier": "mid",
+      "scores": {"planning": 75, "coding": 80, "review": 72, "research": 40, "visual": 60, "large_context": 88, "speed": 55, "cost_efficiency": 80},
+      "source": "New frontier development model listed by agy on 2026-10-19. Agent tier only until reviews prove it (Oliver, 2026-10-19). Scores unreviewed."
+    },
+    {
+      "id": "gemini-4-argon-medium",
+      "provider": "gemini",
+      "model": "gemini-4-argon-medium",
+      "label": "Gemini 4 Argon (Medium)",
+      "tier": "mid",
+      "scores": {"planning": 68, "coding": 74, "review": 65, "research": 35, "visual": 55, "large_context": 85, "speed": 70, "cost_efficiency": 85},
+      "source": "Listed by agy on 2026-10-19. Agent tier only (Oliver, 2026-10-19). Scores unreviewed."
+    },
+    {
+      "id": "gemini-3.8-flash-low",
+      "provider": "gemini",
+      "model": "gemini-3.8-flash-low",
+      "label": "Gemini 3.8 Flash (Low)",
+      "tier": "cheap",
+      "scores": {"planning": 45, "coding": 55, "review": 45, "research": 30, "visual": 40, "large_context": 70, "speed": 92, "cost_efficiency": 95},
+      "source": "Listed by agy on 2026-10-19. Cheapest Gemini option; sub-agent tier. Scores unreviewed."
+    },
+    {
+      "id": "perplexity-web",
+      "provider": "perplexity",
+      "model": null,
+      "label": "Perplexity (browser, via gstack)",
+      "tier": "mid",
+      "scores": {"planning": 20, "coding": 10, "review": 20, "research": 85, "visual": 10, "large_context": 40, "speed": 50, "cost_efficiency": 85},
+      "source": "Research only. On this machine Google's robot check blocks its source search (likely VPN IP)."
+    },
+    {
+      "id": "claude-haiku-native",
+      "provider": "claude-native",
+      "model": "haiku",
+      "label": "Claude Haiku (native repetitive-worker subagent)",
+      "tier": "cheap",
+      "scores": {"planning": 40, "coding": 55, "review": 45, "research": 30, "visual": 30, "large_context": 50, "speed": 88, "cost_efficiency": 60},
+      "source": "Launched by the Claude host itself (Agent tool, repetitive-worker), not by DeltaRoute. Read-only repetitive work."
+    }
+  ]
+}
