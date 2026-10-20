@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test.mjs telemetry.test.mjs fallback-policy.test.mjs failover.test.mjs state-file.test.mjs specialists.test.mjs media-evidence.test.mjs workflows.test.mjs coordinator-state.test.mjs account-limits.test.mjs coordinator-supervisor.test.mjs routing-memory.test.mjs provider-command.test.mjs setup.test.mjs install-skills.test.mjs",
+    "test": "node --test test.mjs honest-failures.test.mjs telemetry.test.mjs fallback-policy.test.mjs failover.test.mjs state-file.test.mjs specialists.test.mjs media-evidence.test.mjs workflows.test.mjs coordinator-state.test.mjs account-limits.test.mjs coordinator-supervisor.test.mjs routing-memory.test.mjs provider-command.test.mjs setup.test.mjs install-skills.test.mjs",
     "start": "node server.mjs",
     "usage": "node usage-report.mjs",
     "test:process": "node benchmarks/provider-fallback-process-tests.mjs",
     "test:install": "python benchmarks/installer-policy-tests.py",
-    "skills:verify": "node install-skills.mjs --verify"
+    "skills:verify": "node install-skills.mjs --verify",
+    "smoke": "node smoke.mjs"
   },
   "description": "Local subscription-based multi-provider delegation, persistent workflows and reviewed routing memory for Claude Code and Codex.",
   "license": "MIT",

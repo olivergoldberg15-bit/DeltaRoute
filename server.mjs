@@ -16,7 +16,7 @@ import {atomicWriteJSON} from './state-file.mjs';
 import {runFailover} from './failover.mjs';
 import {rankCandidates,recordRoutingReview} from './routing-memory.mjs';
 import {parseHeadLimit,recordHeadLimit} from './coordinator-state.mjs';
-import {createWorkflow,readWorkflow,workflowSummary,workflowStep,reserveStep,checkpointStep,workloadProfile,workflowAdvice,auditWorktree} from './workflows.mjs';
+import {createWorkflow,readWorkflow,workflowSummary,workflowStep,reserveStep,checkpointStep,workloadProfile,workflowAdvice,auditWorktree,changedPaths} from './workflows.mjs';
 import {candidateProviders,classifyFailure,accountKey,failureCooldownMs} from './fallback-policy.mjs';
 
 const COORDINATOR_ID=process.env.DELTAROUTE_COORDINATOR==='codex'?'codex':'claude';
@@ -122,6 +122,7 @@ async function attemptWorker(id){
   const wrongSandbox=job.mode==='code'&&job.provider==='codex'&&sandboxActual==='read-only';
   let error=providerError||(!String(answer).trim()&&code===0?'Provider returned an empty answer':null)||(wrongSandbox?'Codex started read-only despite a code assignment; no implementation success is assumed.':code!==0?(stderr||stdout).slice(-12000):null);
   let scopeAudit=null;if(job.workflowRef){const plan=readWorkflow(ROOT,job.workflowRef.id);if(plan.contractHash!==job.workflowRef.contractHash)throw Error('Workflow contract mismatch');if(job.baseRef||job.mode==='code'){scopeAudit=auditWorktree(cwd,job.baseRef,job.workflowRef.allowedPaths);if(!scopeAudit.passed)error='Scope drift: changed paths outside the workflow assignment: '+scopeAudit.outside.join(', ');}}
+  if(job.mode==='code'&&!error&&code===0&&!(scopeAudit?scopeAudit.changedPaths:changedPaths(cwd,job.baseRef||'HEAD')).length)error='No changes: the code job finished but changed no files, so it is not counted as completed.';
   update(id,{scopeAudit,status:code===0&&!error?'completed':'failed',exitCode:code,answer:answer.slice(-80000),error,modelUsed,sandboxActual,tokenUsage:parseWorkerUsage(job.provider,stdout,stderr),sources:researchPacket?.sources,sourceValidation:researchPacket?.sourceValidation,citationProvenance:researchPacket?'Collected validated evidence packet; the coordinator must review answer against these sources':null,finishedAt:new Date().toISOString(),usage:'Provider-managed subscription allowance. No paid API fallback configured.'});
  }catch(e){if(readJob(id).status!=='cancelled')update(id,{status:'failed',error:e.message,finishedAt:new Date().toISOString()});}
  finally{if(timer)clearTimeout(timer);if(slot)fs.rmSync(slot,{recursive:true,force:true});}
@@ -183,6 +184,7 @@ async function call(name,a={}){
   if(typeof a.task!=='string'||!a.task.trim()||a.task.length>100000)throw Error('Task must contain 1 to 100000 characters');
   const cwd=path.resolve(a.cwd||process.cwd());if(!fs.statSync(cwd).isDirectory())throw Error('cwd must be an existing directory');
   const mode=a.mode||'read-only';if(!['read-only','code'].includes(mode))throw Error('Invalid mode');
+  if(mode==='code'||binding&&a.baseRef){git(['rev-parse','--show-toplevel'],cwd);if(git(['status','--porcelain'],cwd))throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode. Nothing was launched and no step try was used.');}
   const category=a.category||((videoURL(a.task)&&/watch|view|analy[sz]e|summari[sz]e|break.?down/i.test(a.task))?'video_analysis':'implementation'),provider=a.provider==='auto'||!a.provider?rankCandidates(ROOT,{category,candidates:candidateProviders({category,mode,workers:available()}),workers:available()}).providers[0]||null:a.provider;
   const requestedScope=category==='social_research'||a.research_scope?researchScope(a.research_scope||{},category==='social_research'?a.task:''):undefined;
   if(provider==='claude')throw Error('Handle this category directly in the Claude coordinator; external delegation is unnecessary unless explicitly requested.');

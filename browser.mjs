@@ -3,6 +3,9 @@ import {collectResearchEvidence,selectPrimarySearchLinks,primaryDomains,hasUsabl
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// Google's "unusual traffic" page lives at /sorry/ and has no result links, so it must be named, not reported as "no source found".
+export function searchBotCheck(url,text){return /\/\/(?:www\.)?google\.[a-z.]+\/sorry\//i.test(String(url||''))||/unusual traffic|not a robot|captcha|verify you are human|checking your browser/i.test(String(text||''));}
+export const SEARCH_BOT_CHECK='Primary search browser challenge: Google showed its "unusual traffic" robot check, usually because of a VPN or shared IP. No bypass attempted; turn the VPN off or run this research by hand.';
 export function researchGate(data){if(data.challenge)return 'Browser challenge requires user handoff';const answer=String(data.answer||'').trim();if((data.loginRequired&&!answer)||((answer.length<1200)&&/^(please )?(sign[ -]?up|sign[ -]?in|log[ -]?in|subscribe|upgrade).{0,120}(repeat|continue|request|access|unlock)|you(?: have|'ve) reached.{0,70}(limit|quota)/i.test(answer)))return 'Provider requires browser sign-in or has exhausted its free allowance';return null;}
 function execute(command,args,env){return new Promise((resolve,reject)=>{
  const p=spawn(command,args,{env,windowsHide:true,stdio:['ignore','pipe','pipe']});let stdout='',stderr='';
@@ -25,7 +28,7 @@ async function browserResearchOnce(provider,prompt,cfg,root,domains=[]){
    const question=prompt.replace(/^.*?factual question: /s,'').split('\nRequired primary publisher domains:')[0];const sources=[],excerpts=[];
    for(const domain of (domains.length?domains:[null])){
     await browse('goto','https://www.google.com/search?q='+encodeURIComponent((domain?'site:'+domain+' ':'')+question));
-    const search=await browse('snapshot','-i');if(/captcha|verify you are human|unusual traffic|checking your browser/i.test(search))throw Error('Primary search browser challenge requires user handoff.');
+    const landed=JSON.parse(await browse('js','({url:location.href,text:document.body?document.body.innerText.slice(0,4000):""})'));if(searchBotCheck(landed.url,landed.text))throw Error(SEARCH_BOT_CHECK);
     const raw=await browse('js','Array.from(document.querySelectorAll("a[href]")).map(a=>({title:a.innerText,url:a.href,result:!!a.querySelector("h3")||/uoh=3/.test(a.href)}))');
     const links=selectPrimarySearchLinks(JSON.parse(raw),domain);if(!links.length)throw Error('Primary search returned no original source for '+domain);
     const chosen=links.find(a=>a.title&&a.url.split('/').length>4)||links[0];await browse('goto',chosen.url);
