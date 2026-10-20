@@ -1,7 +1,9 @@
 import {testTempRoot} from './test-fixtures.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import {spawnSync} from 'node:child_process';
 import os from 'node:os';
-import {createWorkflow,readWorkflow,workflowStep,reserveStep,checkpointStep,auditChangedPaths,auditWorktree,workloadProfile,workflowSummary} from './workflows.mjs';
+import {createWorkflow as createPlan,approvePlan,readWorkflow,workflowStep,reserveStep,checkpointStep,auditChangedPaths,auditWorktree,workloadProfile,workflowSummary} from './workflows.mjs';
+// These tests cover execution rules, so each plan is approved as soon as it is created; operation-plan.test.mjs covers the gate itself.
+const createWorkflow=(root,args)=>{const plan=createPlan(root,args);return approvePlan(root,plan.id,{approvedByUser:'Test approval'});};
 function setup(t,spec={}){const root=fs.mkdtempSync(path.join(testTempRoot,'deltaroute-heavy-test-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const jobs=new Map(),read=id=>{if(!jobs.has(id))throw Error('No job');return jobs.get(id);};const plan=createWorkflow(root,{task:'Implement only the requested feature. Preserve the public API.',cwd:root,workflow:{constraints:['Preserve public API'],non_goals:['No redesign'],steps:[{id:'code',task:'Implement bounded feature',acceptance:['Tests pass']},{id:'review',task:'Review result',category:'review',depends_on:['code'],acceptance:['Meets original prompt']}],...spec}});return {root,plan,jobs,read};}
 function finish(f,step='code',id='job1',overrides={}){f.jobs.set(id,{id,status:'completed',mode:'read-only',...overrides});reserveStep(f.root,f.plan.id,step,id,f.read);}
 const check={accepted:true,note:'Reviewed original prompt and verified evidence',checks:[{criterion:'Tests pass',passed:true,evidence:'Local fixture output: pass'}]};
