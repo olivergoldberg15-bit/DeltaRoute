@@ -1,7 +1,7 @@
 <!-- deltaroute:codex:start -->
 # DeltaRoute (Δ)
 If MODEL_ROUTER_WORKER=1, execute only the assigned work. Do not call DeltaRoute or other AI CLIs; the worker already has a scoped brief.
-Apply DeltaRoute's routing policy in each conversation. Codex owns planning, review and integration for Codex-started work. Keep tiny/local tasks here; delegate independent bounded work when useful. The `deltaroute` MCP server exposes list_workers, recommend_route, submit_task, get_task and cancel_task. recommend_route accepts optional task text and returns relevant specialist skill paths. Existing permissions and repository instructions remain in force.
+Apply DeltaRoute's routing policy in each conversation. Codex owns planning, review and integration for Codex-started work. Keep tiny/local tasks here; delegate independent bounded work when useful. The `deltaroute` MCP server exposes list_workers, recommend_route, submit_task, get_task, cancel_task and model_registry. recommend_route accepts optional task text and returns relevant specialist skill paths. Existing permissions and repository instructions remain in force.
 
 Native entry skill: ~/.agents/skills/deltaroute/SKILL.md. Load it for specialist animation/3D/realism guidance, token/quality audits, video URLs or social trends. Skill-library bodies are loaded only on demand. Upstream defaults do not authorize publishing, paid APIs, audio uploads or new external services. Existing required video workflows take precedence.
 

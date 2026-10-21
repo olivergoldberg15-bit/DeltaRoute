@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createWorkflow,approvePlan,reserveStep,reserveSubagent,checkpointStep,simulatedReview,finalReview} from './workflows.mjs';
 import {readEvents} from './events.mjs';
-import {renderDashboard} from './dashboard.mjs';
+import {renderDashboard,openDashboard} from './dashboard.mjs';
 
 function setup(t){const root=fs.mkdtempSync(path.join(testTempRoot,'deltaroute-dash-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const jobs=new Map(),read=id=>{if(!jobs.has(id))throw Error('No job');return jobs.get(id);};
  const plan=createWorkflow(root,{task:'Ship the <script>alert(1)</script> page',cwd:root,workflow:{routes:[{id:'build'},{id:'research'}],steps:[{id:'page',route:'build',task:'Build',acceptance:['Works'],subagents:[{id:'copy',task:'Draft copy'}]},{id:'facts',route:'research',task:'Facts',category:'research',acceptance:['Works']}]}});return {root,id:plan.id,jobs,read};}
@@ -34,4 +34,13 @@ test('the dashboard draws the tree, escapes text and refreshes until done',t=>{
  simulatedReview(f.root,f.id,{score:88,note:'Opened it',evidence:['clicked through'],visual_evidence:[]},f.read);finalReview(f.root,f.id,{chiefNote:'Good'},f.read);finalReview(f.root,f.id,{approvedByUser:'ship it'},f.read);
  html=fs.readFileSync(renderDashboard(f.root,f.id,f.read),'utf8');
  assert.match(html,/Done, approved by you/);assert.equal(/http-equiv="refresh"/.test(html),false);assert.match(html,/You approved the result: &quot;ship it&quot;/);
+});
+
+test('a new plan\'s dashboard opens through the OS file handler without a console window',t=>{
+ const f=setup(t);const file=renderDashboard(f.root,f.id,f.read);const calls=[];
+ const launch=(command,args,options)=>{calls.push({command,args,options});return {unref(){},on(){}};};
+ assert.equal(openDashboard(file,{platform:'win32',launch}),true);
+ assert.deepEqual(calls[0].command,'explorer.exe');assert.deepEqual(calls[0].args,[file]);assert.equal(calls[0].options.windowsHide,true);assert.equal(calls[0].options.detached,true);
+ assert.equal(openDashboard(file,{platform:'darwin',launch}),true);assert.equal(calls[1].command,'open');
+ assert.equal(openDashboard(path.join(f.root,'missing.html'),{platform:'win32',launch}),false);assert.equal(calls.length,2);
 });

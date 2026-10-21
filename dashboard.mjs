@@ -6,6 +6,14 @@ import path from 'node:path';
 import {readWorkflow, workflowSummary, jobTokens} from './workflows.mjs';
 import {readEvents} from './events.mjs';
 import {PASS_SCORE} from './review.mjs';
+import {spawn} from 'node:child_process';
+
+/** Open a dashboard in the default browser through the OS file handler: no console window, never waited on. */
+export function openDashboard(file, {platform = process.platform, launch = spawn} = {}) {
+  if (!file || !fs.existsSync(file)) return false;
+  const [command, args] = platform === 'win32' ? ['explorer.exe', [file]] : platform === 'darwin' ? ['open', [file]] : ['xdg-open', [file]];
+  try { const child = launch(command, args, {detached: true, stdio: 'ignore', windowsHide: true}); child.on?.('error', () => {}); child.unref?.(); return true; } catch { return false; }
+}
 
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
 const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(n);

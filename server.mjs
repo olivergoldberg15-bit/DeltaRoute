@@ -20,7 +20,7 @@ import {createWorkflow,readWorkflow,workflowSummary,workflowStep,reserveStep,che
 import {candidateProviders,classifyFailure,accountKey,failureCooldownMs} from './fallback-policy.mjs';
 import {selfCheckLogs} from './review.mjs';
 import {appendEvent} from './events.mjs';
-import {renderDashboard} from './dashboard.mjs';
+import {renderDashboard,openDashboard} from './dashboard.mjs';
 import {loadRegistry,registryAge,assignRole,assignRoles,createProposal,applyProposal,recordLiveModels,parseAgyModels} from './registry.mjs';
 
 const COORDINATOR_ID=process.env.DELTAROUTE_COORDINATOR==='codex'?'codex':'claude';
@@ -191,7 +191,7 @@ async function call(name,a={}){
   if(process.env.MODEL_ROUTER_WORKER)throw Error('Recursive delegation is disabled');
   const action=a.action||'delegate';let binding=null;
   if(action==='report_head_limit'){const limit=parseHeadLimit(a.limit_error||'','');if(!limit.limited)throw Error('Supply an observed hard quota error; do not infer head exhaustion');recordHeadLimit(ROOT,{provider:COORDINATOR_ID,error:limit.error,resetAt:limit.resetAt});return {head:COORDINATOR_ID,status:'limited',resetAt:limit.resetAt,managedHandoff:'The external managed supervisor performs replacement only after the old head stops.'};}
-  if(action==='create_workflow'){const cwd=path.resolve(a.cwd||process.cwd());if(!fs.statSync(cwd).isDirectory())throw Error('cwd must be an existing directory');const created=createWorkflow(ROOT,{task:a.task,cwd,workflow:a.workflow,coordinator:COORDINATOR_ID});return {...created,dashboard:refreshDashboard(created.id),next:'Show the user this Operation Plan (routes, agents, budgets) and wait for their approval; then call approve_plan with their words.'};}
+  if(action==='create_workflow'){const cwd=path.resolve(a.cwd||process.cwd());if(!fs.statSync(cwd).isDirectory())throw Error('cwd must be an existing directory');const created=createWorkflow(ROOT,{task:a.task,cwd,workflow:a.workflow,coordinator:COORDINATOR_ID}),dashboard=refreshDashboard(created.id);const opened=config().dashboard?.autoOpen===true&&openDashboard(dashboard);return {...created,dashboard,dashboardOpened:opened,next:'Show the user this Operation Plan (routes, agents, budgets) and wait for their approval; then call approve_plan with their words.'};}
   if(['checkpoint','run_step','approve_plan','run_subagent','simulated_review','final_review'].includes(action)){const owner=readWorkflow(ROOT,a.workflow_id).head?.owner||readWorkflow(ROOT,a.workflow_id).coordinator;if(owner!==COORDINATOR_ID)throw Error('Workflow belongs to '+owner+' head; use managed handoff before changing coordinators');}
   if(action==='checkpoint'){const reviewed=checkpointStep(ROOT,a.workflow_id,a.step_id,a.checkpoint||{},readJob);const plan=readWorkflow(ROOT,a.workflow_id),jobId=plan.progress[a.step_id].jobs.at(-1);try{if(plan.progress[a.step_id].checkpoint?.completedBy!=='coordinator')recordRoutingReview(ROOT,readJob(jobId),{accepted:a.checkpoint.accepted!==false&&!(a.checkpoint.score<80)&&Boolean(plan.progress[a.step_id].checkpoint),note:a.checkpoint.score===undefined?a.checkpoint.note:'Score '+a.checkpoint.score+': '+a.checkpoint.note,scopeViolation:readJob(jobId).scopeAudit?.passed===false});}catch(e){reviewed.learningWarning=e.message;}reviewed.dashboard=refreshDashboard(a.workflow_id);return reviewed;}
   if(action==='approve_plan')return {...approvePlan(ROOT,a.workflow_id,{approvedByUser:a.approved_by_user}),dashboard:refreshDashboard(a.workflow_id)};

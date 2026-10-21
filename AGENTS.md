@@ -8,7 +8,7 @@ Keep local `config.json`, account files, prompts, logs, caches, worktrees and
 workflow/routing-memory state out of Git. Review the staged file list before
 publishing. Preserve third-party licenses and pinned source provenance.
 
-Keep five MCP tool names stable. Preserve existing explicit permissions and
+Keep the six MCP tool names stable. Preserve existing explicit permissions and
 unrelated host configuration. No API-key fallback, challenge bypass, automatic
 publishing or account-limit evasion. Retain failures and counters; never label
 process completion as verified quality without coordinator evidence.

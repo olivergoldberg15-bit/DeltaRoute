@@ -3,6 +3,7 @@
   "maxConcurrent": 2,
   "timeoutSeconds": 900,
   "browser": {"command": "", "stateFile": "", "browsersPath": ""},
+  "dashboard": {"autoOpen": true},
   "workers": {
     "codex": {"enabled": false, "command": "", "model": null, "capabilities": {"visionFrames": true}, "strengths": ["implementation", "debugging", "tests", "review"]},
     "gemini": {"enabled": false, "command": "", "model": null, "strengths": ["quick_coding", "iteration", "large_context"]},
