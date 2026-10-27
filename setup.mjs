@@ -55,6 +55,9 @@ export function discover({root=ROOT,home=os.homedir(),env=process.env,platform=p
   const gemini=findProgram(['gemini'],{env,platform});
   const geminiScript=gemini?'':packageScript('@google/gemini-cli',npmBases);
   const cursor=findProgram(['cursor-agent','agent'],{env,platform});
+  // The npm package wraps a native binary; call it directly when it is there.
+  const higgsfield=findProgram([env.DELTAROUTE_HIGGSFIELD_COMMAND||'','higgsfield'],{env,platform})||firstFile(npmBases.map(base=>path.join(base,'@higgsfield/cli/vendor',platform==='win32'?'hf.exe':'hf')));
+  const higgsfieldScript=higgsfield?'':packageScript('@higgsfield/cli',npmBases);
   // An unqualified agent program could belong to another product. Only a
   // cursor-branded path is accepted without an explicit user configuration.
   const cursorVerified=cursor&&(/cursor/i.test(cursor)||path.basename(cursor).startsWith('cursor-agent'))?cursor:'';
@@ -63,7 +66,7 @@ export function discover({root=ROOT,home=os.homedir(),env=process.env,platform=p
   const watchScript=firstFile([path.join(root,'skill-library/media/watch/scripts/watch.py'),path.join(home,'.codex/skills/watch/scripts/watch.py'),path.join(home,'.agents/skills/watch/scripts/watch.py')]);
   const browsersPath=[env.PLAYWRIGHT_BROWSERS_PATH,env.LOCALAPPDATA&&path.join(env.LOCALAPPDATA,'ms-playwright'),
     path.join(home,'AppData/Local/ms-playwright'),path.join(home,'.cache/ms-playwright'),path.join(home,'Library/Caches/ms-playwright')].find(value=>value&&fs.existsSync(value))||'';
-  return {codex,claude,agy,gemini,geminiScript,cursor:cursorVerified,browser,browsersPath,watchScript,
+  return {codex,claude,agy,gemini,geminiScript,cursor:cursorVerified,higgsfield,higgsfieldScript,browser,browsersPath,watchScript,
     python:findProgram(['python3','python'],{env,platform}),ytDlp:findProgram(['yt-dlp'],{env,platform}),ffmpeg:findProgram(['ffmpeg'],{env,platform}),contextStart:findContextMode({home,root})};
 }
 export function buildConfig(found,{root=ROOT,template=JSON.parse(fs.readFileSync(path.join(ROOT,'config.example.json'),'utf8'))}={}) {
@@ -80,6 +83,10 @@ export function buildConfig(found,{root=ROOT,template=JSON.parse(fs.readFileSync
   // Grok runs on the user's own grok.com subscription through the research browser; Cursor is only the fallback transport.
   if(found.browser){workers.grok.transport='browser';workers.grok.command='';workers.grok.enabled=true;workers.grok.reason='gstack detected; sign into your grok.com account with research-login.ps1 grok before use. Native live X access is not verified.';}
   else{workers.grok.command=found.cursor||'';workers.grok.enabled=false;}
+  // Higgsfield spends account credits, so setup finds it but never turns it on by itself.
+  if(workers.higgsfield){workers.higgsfield.command=found.higgsfield||(found.higgsfieldScript?process.execPath:'');workers.higgsfield.enabled=false;
+   if(found.higgsfieldScript)workers.higgsfield.script=found.higgsfieldScript;
+   workers.higgsfield.reason=workers.higgsfield.command?'Higgsfield CLI detected. Image jobs spend account credits (priced and capped first); set enabled to true to use Nano Banana Pro.':'Install the Higgsfield CLI and run higgsfield auth login to use Nano Banana Pro for image jobs.';}
   workers.perplexity.enabled=!!found.browser;
   workers.perplexity.reason=found.browser?'gstack detected; sign into your existing account with research-login.ps1 before use.':'Install gstack separately for browser research; no paid research API fallback is configured.';
   config.coordinators={claude:{command:found.claude||''},codex:{command:found.codex||''}};

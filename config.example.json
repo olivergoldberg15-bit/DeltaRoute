@@ -5,9 +5,10 @@
   "browser": {"command": "", "stateFile": "", "browsersPath": ""},
   "dashboard": {"autoOpen": true},
   "workers": {
-    "codex": {"enabled": false, "command": "", "model": null, "capabilities": {"visionFrames": true}, "strengths": ["implementation", "debugging", "tests", "review"]},
+    "codex": {"enabled": false, "command": "", "model": null, "capabilities": {"visionFrames": true, "image": "built-in image_generation (ChatGPT plan, no credits)"}, "strengths": ["implementation", "debugging", "tests", "review"]},
     "gemini": {"enabled": false, "command": "", "model": null, "strengths": ["quick_coding", "iteration", "large_context"]},
     "cursor": {"enabled": false, "command": "", "model": "auto", "strengths": ["implementation", "frontend", "integration"]},
+    "higgsfield": {"enabled": false, "transport": "higgsfield", "command": "", "model": "nano_banana_2", "maxCreditsPerJob": 24, "capabilities": {"image": "Nano Banana Pro (Higgsfield credits)"}, "strengths": ["image"], "reason": "Image jobs only. Spends Higgsfield account credits, priced and capped before generating."},
     "grok": {"enabled": false, "transport": "cursor", "command": "", "model": null, "strengths": ["social_research", "current_events"], "reason": "Requires an explicitly selected Grok model available through your Cursor account; native live X access is not verified."},
     "perplexity": {"enabled": false, "transport": "browser", "strengths": ["research", "citations"]},
     "local": {"enabled": false, "model": null, "strengths": ["simple", "summarization"], "reason": "No local model transport has been verified."}

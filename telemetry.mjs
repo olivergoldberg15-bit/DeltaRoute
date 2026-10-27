@@ -18,6 +18,7 @@ export function compactJob(job,root,maxAnswer=6000){
  if(job.mediaEvidence){const {reportExcerpt,...media}=job.mediaEvidence;result.mediaEvidence=media;}
  if(job.workflowRef)result.workflowRef=job.workflowRef;if(job.scopeAudit){const audit=job.scopeAudit;result.scopeAudit={...audit,changedPaths:audit.changedPaths?.slice(0,40),outside:audit.outside?.slice(0,20),changedPathCount:audit.changedPaths?.length||0,outsidePathCount:audit.outside?.length||0,pathsTruncated:(audit.changedPaths?.length||0)>40||(audit.outside?.length||0)>20};}if(job.limits)result.limits=job.limits;
  if(job.handoff)result.handoff=job.handoff;
+ if(job.files)result.files=job.files;if(job.credits)result.credits=job.credits;if(job.warning)result.warning=job.warning;if(job.recoveredFrom)result.recoveredFrom=job.recoveredFrom;if(job.outDir)result.outDir=job.outDir;
  if(job.attempts)result.attempts=job.attempts.map(a=>({taskId:a.taskId,provider:a.provider,status:a.status,error:a.error,failureKind:a.failure?.kind,worktree:a.worktree}));
  result.artifacts={status:root.replaceAll('\\','/')+'/jobs/'+job.id+'/status.json'};
  if(job.childPid||job.resultTaskId){const dir=root.replaceAll('\\','/')+'/jobs/'+(job.resultTaskId||job.id);result.artifacts.answer=dir+'/answer.txt';result.artifacts.rawOutput=dir+'/stdout.log';}

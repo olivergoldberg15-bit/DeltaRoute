@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — image jobs and kept work
+
+- Image category: `submit_task` with `category: image` and `images.outputs`
+  runs on Nano Banana Pro through the user's Higgsfield login (new `higgsfield`
+  worker, off until enabled). Each job is priced before generating, capped per
+  job and against the balance, and reports credits used. Codex's built-in image
+  tool is the backup. Higgsfield is never a fallback for other categories.
+- Image jobs write into their own output folder and can copy checked files to
+  `deliver_to`; no clean Git checkout or throwaway repo is needed.
+- A run cut off by the time limit or a dropped connection is judged by what it
+  left: image jobs whose files all exist count as completed with a warning, and
+  code jobs that already changed files go back to the coordinator instead of
+  starting a fallback that would redo the work.
+- Dropped-connection errors ("stream disconnected", "No such host") are now
+  classified as outages instead of unknown failures.
+
 ## 1.6.0 — Operation Plans, scored review and honest failures
 
 - Operation Plans: the user approves the plan first; steps run in routes with

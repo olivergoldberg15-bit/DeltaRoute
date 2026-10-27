@@ -46,8 +46,8 @@ export function classifyFailure(error, cooldowns = {}) {
   else if (/\bquota\b|rate[ -]?limit|too many requests|\b429\b|usage limit|hard limit|allowance (?:exhausted|reached|used)|free allowance|(?:insufficient|exhausted|out of) credits|credit balance|subscription limit|usage exhausted|budget limit|not enough credits|limit.{0,30}reset/i.test(text)) kind = 'quota';
   else if (/\btime[ -]?out\b|\btimed out\b|exceeded (?:the )?(?:time|deadline)|deadline exceeded|ETIMEDOUT|worker exceeded time limit/i.test(text)) kind = 'timeout';
   else if (/primary sources? missing|no original sources?|source(?:s| packet)? (?:is |are )?(?:incomplete|missing)|(?:missing|insufficient|no) citations|citation validation failed/i.test(text)) kind = 'source_incomplete';
-  else if (/model.{0,50}(?:not found|unavailable|not available|not supported|unsupported|not enabled|does not exist)|(?:unknown|unsupported|invalid) model|started read-only despite a code assignment|unsupported (?:capability|feature)|does not support.{0,30}(?:model|feature|capability)|model_not_found|provider returned an empty answer|changed no files|spawn .{0,100}ENOENT/i.test(text)) kind = 'capability';
-  else if (/\b50[0234]\b|service unavailable|bad gateway|gateway error|internal server error|provider outage|temporarily unavailable|overloaded|connection (?:refused|reset|closed|failed)|network (?:error|unreachable|failed)|fetch failed|ECONNRESET|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|ENOTFOUND|worker process exited unexpectedly/i.test(text)) kind = 'outage';
+  else if (/model.{0,50}(?:not found|unavailable|not available|not supported|unsupported|not enabled|does not exist)|(?:unknown|unsupported|invalid) model|started read-only despite a code assignment|unsupported (?:capability|feature)|does not support.{0,30}(?:model|feature|capability)|model_not_found|provider returned an empty answer|changed no files|expected files are missing|spawn .{0,100}ENOENT/i.test(text)) kind = 'capability';
+  else if (/\b50[0234]\b|service unavailable|bad gateway|gateway error|internal server error|provider outage|temporarily unavailable|overloaded|connection (?:refused|reset|closed|failed)|network (?:error|unreachable|failed)|fetch failed|ECONNRESET|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|ENOTFOUND|stream disconnected|no such host|worker process exited unexpectedly/i.test(text)) kind = 'outage';
   const fallbackEligible = Object.hasOwn(DEFAULT_COOLDOWNS, kind);
   return {
     kind,
@@ -60,8 +60,11 @@ export function classifyFailure(error, cooldowns = {}) {
 
 const CODING = new Set(['implementation', 'quick_coding', 'iteration', 'debugging', 'tests', 'review', 'large_context', 'frontend']);
 const CLI = new Set(['codex', 'gemini', 'cursor']);
-const PROVIDERS = new Set(['codex', 'gemini', 'cursor', 'perplexity', 'grok']);
+const PROVIDERS = new Set(['codex', 'gemini', 'cursor', 'perplexity', 'grok', 'higgsfield']);
+// Image jobs: Nano Banana Pro on the user's Higgsfield credits first, Codex's built-in image tool as the no-credit backup.
+const IMAGE = new Set(['higgsfield', 'codex']);
 const ORDERS = Object.freeze({
+  image: ['higgsfield', 'codex'],
   video_analysis: ['codex'],
   implementation: ['codex', 'gemini', 'cursor'],
   quick_coding: ['gemini', 'codex', 'cursor'],
@@ -78,7 +81,8 @@ const ORDERS = Object.freeze({
 
 /** Research CLI candidates require a separately collected, validated source packet. */
 export function candidateProviders({requested = 'auto', category = 'implementation', mode = 'read-only', workers = [], blockedAccounts = [], attempted = []} = {}) {
-  if (!['read-only', 'code'].includes(mode)) return [];
+  if (!['read-only', 'code', 'artifacts'].includes(mode)) return [];
+  if ((mode === 'artifacts') !== (category === 'image')) return [];
   if (requested === 'claude' || (requested === 'auto' && ['simple', 'planning', 'creative'].includes(category))) return [];
   const definitions = Array.isArray(workers) ? workers
     : Object.entries(workers || {}).map(([name, value]) => ({...value, name}));
@@ -90,6 +94,8 @@ export function candidateProviders({requested = 'auto', category = 'implementati
     if (!worker?.enabled || worker.installed === false || worker.availableNow === false) return false;
     if (previous.has(name) || blocked.has(accountKey(name))) return false;
     if(category==='video_analysis'&&name!=='codex')return false;
+    // Credits are spent only on image jobs, never as a fallback for anything else.
+    if (category === 'image' ? !IMAGE.has(name) || worker.capabilities?.image === false : name === 'higgsfield') return false;
     if ((mode === 'code' || CODING.has(category)) && !CLI.has(name)) return false;
     return PROVIDERS.has(name);
   });
