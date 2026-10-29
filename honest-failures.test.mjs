@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {classifyFailure} from './fallback-policy.mjs';
 import {searchBotCheck,SEARCH_BOT_CHECK} from './browser.mjs';
-import {changedPaths} from './workflows.mjs';
+import {changedPaths,dirtyEntries} from './workflows.mjs';
 import {codeVerdict,researchVerdict} from './smoke.mjs';
 // Failures that used to look like success, or like a different failure, now say what actually happened.
 const tmp=fs.mkdtempSync(path.join(testTempRoot,'deltaroute-honest-'));
@@ -40,6 +41,28 @@ test('a dirty checkout is refused before any job exists, so no step try is used'
  const r=spawnSync(process.execPath,['server.mjs','--call','submit_task',JSON.stringify({task:'Edit a.txt',cwd:dir,mode:'code'})],{cwd:runtime,encoding:'utf8',windowsHide:true,env:{...process.env,MODEL_ROUTER_WORKER:''}});
  assert.equal(r.status,1);assert.match(r.stderr,/clean Git checkout.*no step try was used/s);
  assert.deepEqual(fs.readdirSync(path.join(runtime,'jobs')).filter(n=>/^[a-f0-9-]{36}$/.test(n)),[]);
+});
+
+test('gstack runtime files do not make a checkout dirty; real changes still do',()=>{
+ const dir=repo('gstack-files');fs.mkdirSync(path.join(dir,'.gstack'));fs.writeFileSync(path.join(dir,'.gstack','terminal-port'),'5');
+ assert.deepEqual(dirtyEntries(dir),[]);
+ fs.writeFileSync(path.join(dir,'a.txt'),'changed');assert.deepEqual(dirtyEntries(dir),[' M a.txt']);
+});
+
+test('a workflow research attempt is not refused for .gstack/ files, so fallback reaches the provider',()=>{
+ const runtime=path.join(tmp,'runtime-gstack');fs.mkdirSync(runtime);
+ for(const file of fs.readdirSync(import.meta.dirname))if(file.endsWith('.mjs'))fs.copyFileSync(path.join(import.meta.dirname,file),path.join(runtime,file));
+ // No gstack install: an attempt past the checkout guard stops at "not installed", before any browser or provider call.
+ fs.writeFileSync(path.join(runtime,'config.json'),JSON.stringify({maxConcurrent:2,timeoutSeconds:5,browser:{command:path.join(tmp,'no-gstack.exe')},workers:{grok:{enabled:true,transport:'browser'}}}));
+ // The files gstack's terminal agent wrote into the workflow checkout on 2026-10-28.
+ const dir=repo('gstack-workflow');fs.mkdirSync(path.join(dir,'.gstack'));for(const f of ['claude-available.json','terminal-agent-pid','terminal-internal-token','terminal-port'])fs.writeFileSync(path.join(dir,'.gstack',f),'x');
+ const submitted=spawnSync(process.execPath,['server.mjs','--call','submit_task',JSON.stringify({task:'Edit a.txt',cwd:dir,mode:'code',provider:'codex'})],{cwd:runtime,encoding:'utf8',windowsHide:true,env:{...process.env,MODEL_ROUTER_WORKER:''}});
+ assert.doesNotMatch(submitted.stderr,/clean Git checkout/);assert.match(submitted.stderr,/No enabled installed worker/);
+ const baseRef=git(dir,'rev-parse','HEAD').trim();
+ const attempt=()=>{const id=crypto.randomUUID();fs.mkdirSync(path.join(runtime,'jobs',id),{recursive:true});fs.writeFileSync(path.join(runtime,'jobs',id,'status.json'),JSON.stringify({id,parentId:crypto.randomUUID(),provider:'grok',category:'research',task:'Find the original source',cwd:dir,mode:'read-only',baseRef,workflowRef:{id:'w',stepId:'s'},invoked:false,status:'queued'}));spawnSync(process.execPath,['server.mjs','--attempt',id],{cwd:runtime,windowsHide:true,env:{...process.env,MODEL_ROUTER_WORKER:''}});return JSON.parse(fs.readFileSync(path.join(runtime,'jobs',id,'status.json'),'utf8'));};
+ const reached=attempt();assert.equal(reached.status,'failed');assert.equal(reached.error,'gstack browser is not installed');assert.ok(reached.worktree);
+ fs.writeFileSync(path.join(dir,'unsaved.txt'),'x');
+ assert.match(attempt().error,/clean Git checkout/);
 });
 
 test('smoke verdict only passes when the worker really wrote the file',()=>{

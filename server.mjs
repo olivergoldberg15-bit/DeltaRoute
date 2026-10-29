@@ -16,7 +16,7 @@ import {atomicWriteJSON} from './state-file.mjs';
 import {runFailover} from './failover.mjs';
 import {rankCandidates,recordRoutingReview} from './routing-memory.mjs';
 import {parseHeadLimit,recordHeadLimit} from './coordinator-state.mjs';
-import {createWorkflow,readWorkflow,workflowSummary,workflowStep,reserveStep,checkpointStep,workloadProfile,workflowAdvice,auditWorktree,changedPaths,approvePlan,subagentStep,reserveSubagent,simulatedReview,finalReview} from './workflows.mjs';
+import {createWorkflow,readWorkflow,workflowSummary,workflowStep,reserveStep,checkpointStep,workloadProfile,workflowAdvice,auditWorktree,changedPaths,dirtyEntries,approvePlan,subagentStep,reserveSubagent,simulatedReview,finalReview} from './workflows.mjs';
 import {candidateProviders,classifyFailure,accountKey,failureCooldownMs} from './fallback-policy.mjs';
 import {selfCheckLogs} from './review.mjs';
 import {appendEvent} from './events.mjs';
@@ -71,7 +71,7 @@ async function attemptWorker(id){
   let cwd=job.cwd,branch=null;
   if(job.mode==='code'||job.workflowRef&&job.baseRef){
    git(['rev-parse','--show-toplevel'],cwd);
-   if(git(['status','--porcelain'],cwd))throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode.');
+   if(dirtyEntries(cwd).length)throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode.');
    branch='codex/router-'+id.slice(0,8);cwd=path.join(JOBS,id,'worktree');git(['worktree','add','-b',branch,cwd,job.baseRef||'HEAD'],job.cwd);
   }
   // Image jobs write into their own output folder: no Git checkout, nothing else to touch.
@@ -231,7 +231,7 @@ async function call(name,a={}){
   const spec=a.category==='image'?imageSpec(a.images,{cwd}):undefined;
   const mode=spec?'artifacts':a.mode||'read-only';if(!['read-only','code','artifacts'].includes(mode))throw Error('Invalid mode');
   if(spec&&a.provider&&!['auto','higgsfield','codex'].includes(a.provider))throw Error('Invalid request: image jobs run on higgsfield (Nano Banana Pro) or codex');
-  if(mode==='code'||binding&&a.baseRef){git(['rev-parse','--show-toplevel'],cwd);if(git(['status','--porcelain'],cwd))throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode. Nothing was launched and no step try was used.');}
+  if(mode==='code'||binding&&a.baseRef){git(['rev-parse','--show-toplevel'],cwd);if(dirtyEntries(cwd).length)throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode. Nothing was launched and no step try was used.');}
   const category=a.category||((videoURL(a.task)&&/watch|view|analy[sz]e|summari[sz]e|break.?down/i.test(a.task))?'video_analysis':'implementation'),provider=a.provider==='auto'||!a.provider?rankCandidates(ROOT,{category,candidates:candidateProviders({category,mode,workers:available()}),workers:available()}).providers[0]||null:a.provider;
   const requestedScope=category==='social_research'||a.research_scope?researchScope(a.research_scope||{},category==='social_research'?a.task:''):undefined;
   if(provider==='claude')throw Error('Handle this category directly in the Claude coordinator; external delegation is unnecessary unless explicitly requested.');
