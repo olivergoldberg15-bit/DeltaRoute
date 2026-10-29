@@ -22,7 +22,7 @@ if ! node -e "const c=JSON.parse(require('fs').readFileSync(require('os').homedi
   (cd "$ROOT" && claude)
 fi
 
-sudo systemctl restart deltaroute-remote.service
+if [ -d /run/systemd/system ]; then sudo systemctl restart deltaroute-remote.service; else bash "$ROOT/cloud/remote.sh"; fi
 sleep 5
 printf '\n== Phone access\n'
 tmux capture-pane -p -t deltaroute 2>/dev/null | tail -15 || true

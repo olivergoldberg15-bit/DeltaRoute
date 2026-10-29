@@ -51,3 +51,38 @@ jobs:
           name: windows-fault-results
           path: benchmarks/windows-fault-results.json
           if-no-files-found: ignore
+
+  # The real cloud install on a fresh Ubuntu machine (what an Oracle or other VPS gets). It signs in to nothing,
+  # so no subscription is used; it ends by running DeltaRoute's tests on that machine.
+  cloud-install:
+    name: Cloud install on fresh Ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install with cloud/install.sh
+        run: bash cloud/install.sh
+      - name: Tools, config and phone access service are in place
+        run: |
+          export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"
+          command -v claude codex gemini tmux
+          node -e "const c=require('./config.json');if(!c.browser?.command||!require('fs').existsSync(c.browser.command))throw Error('research browser missing');console.log('browser',c.browser.command)"
+          systemctl is-enabled deltaroute-remote.service
+          bash cloud/remote.sh
+
+  # The same container GitHub Codespaces builds from .devcontainer: no systemd, non-root user, install on create.
+  codespace:
+    name: Codespaces container from .devcontainer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the Codespaces container, then check it
+        uses: devcontainers/ci@v0.3
+        with:
+          push: never
+          runCmd: |
+            export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$PATH"
+            command -v claude codex gemini tmux
+            node -e "const c=require('./config.json');if(!c.browser?.command||!require('fs').existsSync(c.browser.command))throw Error('research browser missing');console.log('browser',c.browser.command)"
+            bash cloud/remote.sh

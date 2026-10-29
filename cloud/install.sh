@@ -125,7 +125,9 @@ fi
 
 step "Phone access service (claude remote-control, in tmux so it has a terminal)"
 UNIT=/etc/systemd/system/deltaroute-remote.service
-if [ "$DRY_RUN" = 1 ]; then echo "+ write $UNIT"; else
+# GitHub Codespaces and other containers have no systemd; there cloud/remote.sh starts phone access on each start.
+if [ "$DRY_RUN" != 1 ] && [ ! -d /run/systemd/system ]; then echo "No systemd here (for example GitHub Codespaces): cloud/remote.sh starts phone access."
+elif [ "$DRY_RUN" = 1 ]; then echo "+ write $UNIT"; else
   sudo tee "$UNIT" >/dev/null <<EOF
 [Unit]
 Description=DeltaRoute phone access (Claude Code Remote Control)
@@ -147,8 +149,10 @@ RestartSec=20
 WantedBy=multi-user.target
 EOF
 fi
-run sudo systemctl daemon-reload
-run sudo systemctl enable deltaroute-remote.service
+if [ "$DRY_RUN" = 1 ] || [ -d /run/systemd/system ]; then
+  run sudo systemctl daemon-reload
+  run sudo systemctl enable deltaroute-remote.service
+fi
 
 step "Check DeltaRoute runs on this machine"
 run bash -c "cd '$DR_DIR' && npm test"

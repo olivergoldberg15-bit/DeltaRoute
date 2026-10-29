@@ -1,0 +1,7 @@
+{
+  "name": "DeltaRoute",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "postCreateCommand": "bash cloud/install.sh",
+  "postStartCommand": "bash cloud/remote.sh"
+}
