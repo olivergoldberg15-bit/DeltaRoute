@@ -70,7 +70,8 @@ run git -C "$GS" fetch --quiet origin "$GSTACK_COMMIT"
 run git -C "$GS" checkout --quiet --detach "$GSTACK_COMMIT"
 # Chromium's system libraries first: gstack's setup launches Chromium, and slim images (Codespaces) lack them.
 run sudo env "PATH=$PATH" npx --yes playwright install-deps chromium
-run bash -c "cd '$GS' && ./setup --quiet </dev/null"
+# Research is optional: behind a firewall (Daytona's free tier blocks Chromium's download) the rest still installs.
+run bash -c "cd '$GS' && ./setup --quiet </dev/null" || echo "gstack setup failed here, so the Perplexity and Grok research workers stay unavailable on this machine." >&2
 
 step "DeltaRoute in $DR_DIR"
 SCRIPT_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
