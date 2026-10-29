@@ -7,6 +7,7 @@ import {search} from './search.mjs';
 import {enrichMedia} from './context.mjs';
 import {judge} from './judge.mjs';
 import {checkFormat} from './reply-format.mjs';
+import {replyLimit} from './format.mjs';
 import {logRun} from './log.mjs';
 export async function runPost(post,{env=process.env,store,x,provider=callModel,now=new Date(),fetchImpl=fetch}={}) {
  const start=Date.now(), day=buckets(now).day;
@@ -33,14 +34,15 @@ export async function runPost(post,{env=process.env,store,x,provider=callModel,n
   if(!context.post.username)throw Error('missing_author_username');
   const evidence=await search(context,call); entry.queries=evidence.queries;entry.sources=evidence.sources;
   const pack={...context,...evidence,asked_at:now.toISOString()};
-  const results=await Promise.allSettled(preset.answers.map(async model=>{const answer=await call(model,{input:pack});return {model,...answer};}));
+  const max=replyLimit(env);
+  const results=await Promise.allSettled(preset.answers.map(async model=>{const answer=await call(model,{input:pack,maxLength:max});return {model,...answer};}));
   entry.candidates=results.map((r,i)=>r.status==='fulfilled'?r.value:{model:preset.answers[i],skipped:'provider_error'});
-  const selection=await judge(pack,entry.candidates.filter(c=>c.text),call);
+  const selection=await judge(pack,entry.candidates.filter(c=>c.text),call,max);
   entry.candidates=entry.candidates.map(c=>({...c,score:selection.candidates.find(s=>s.model===c.model)?.score??null}));entry.winner=selection.winner;
   let text=selection.text;
-  const options={author:context.post.username,allowLinks:env.ALLOW_LINKS==='1',expectedLanguage:context.post.lang};
+  const options={author:context.post.username,allowLinks:env.ALLOW_LINKS==='1',expectedLanguage:context.post.lang,maxLength:max};
   let reasons=checkFormat(text,options);
-  if(reasons.length){const rewrite=await call('judge',{input:{pack,text,reasons,instruction:'Rewrite once to satisfy every format rule; return only the reply.'}});text=rewrite.text;reasons=checkFormat(text,options);}
+  if(reasons.length){const rewrite=await call('judge',{input:{pack,text,reasons,instruction:`Rewrite once to satisfy every format rule (at most ${max} characters, emoji and CJK count as two); return only the reply.`},maxLength:max});text=rewrite.text;reasons=checkFormat(text,options);}
   entry.final_text=text;
   if(reasons.length){entry.status='format_failed';entry.reasons=reasons;entry.latency_ms=Date.now()-start;return await logRun(store,entry);}
   await withinBudget();

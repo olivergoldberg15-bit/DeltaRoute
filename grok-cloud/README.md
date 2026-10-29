@@ -12,6 +12,16 @@ CRON_SECRET protects all three endpoints with `Authorization: Bearer ...`.
 Upstash REST is required in production; MemoryStore is only for offline tests.
 HIVE_ORGANIZATION_ID identifies the Atlas Hive organization.
 
+Reply length: real @grok replies run 150-500 characters (median about 330
+in a sample of 24 from October 2026), which needs X Premium on the bot
+account. Set X_PREMIUM=1 when it has Premium: replies then aim for 200-400
+and stay under 550. Without it the limit is 280, X's cap for standard
+accounts, counted the way X counts (emoji and CJK characters count two).
+A reply over the limit gets one rewrite and is otherwise held back, never
+sent to X. Answers lead with the verdict, disagree plainly when the
+evidence says so, name sources in words, and answer each part of a
+multi-part question in order; plain numbered lines are allowed.
+
 `PRESET=top` is the default; `lean` selects the cheaper configured ensemble.
 Prices and dated Gemini prices live in models.config.json. Default guards:
 20 replies/hour, 600-second per-author cooldown, $10 UTC daily spend cap.
