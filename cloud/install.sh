@@ -68,8 +68,9 @@ GS="$HOME/.claude/skills/gstack"
 [ -d "$GS/.git" ] || run git clone https://github.com/garrytan/gstack.git "$GS"
 run git -C "$GS" fetch --quiet origin "$GSTACK_COMMIT"
 run git -C "$GS" checkout --quiet --detach "$GSTACK_COMMIT"
-run bash -c "cd '$GS' && ./setup --quiet </dev/null"
+# Chromium's system libraries first: gstack's setup launches Chromium, and slim images (Codespaces) lack them.
 run sudo env "PATH=$PATH" npx --yes playwright install-deps chromium
+run bash -c "cd '$GS' && ./setup --quiet </dev/null"
 
 step "DeltaRoute in $DR_DIR"
 SCRIPT_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
