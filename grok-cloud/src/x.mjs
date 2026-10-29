@@ -1,3 +1,8 @@
+import {createZernioX} from './zernio.mjs';
+// With ZERNIO_API_KEY set, X goes through the owner's Zernio workspace; otherwise straight to the X API.
+export function xClient(env, fetchImpl = fetch, charge = () => {}, store = null) {
+  return env.ZERNIO_API_KEY ? createZernioX(env, fetchImpl, charge) : createX(env, fetchImpl, charge, store);
+}
 // X OAuth 2.0 user tokens expire after two hours. With X_CLIENT_ID set, the bot renews its own access token
 // from the refresh token that scripts/x-auth.mjs saved in the store (or X_REFRESH_TOKEN to seed it). X rotates
 // the refresh token on every use, so the new one is saved at once. Every live X call runs under the job lock.

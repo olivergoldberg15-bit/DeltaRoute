@@ -20,7 +20,19 @@ KILL_SWITCH=1 or Redis kill_switch=1 stops work. ALLOW_LINKS defaults off.
 Do not enable LIVE until the owner approves, X approves AI replies, the account
 has its automation label and its own identity, and dry-run review passes.
 
-X sign-in: an OAuth 2.0 user access token expires after about two hours, so
+X through Zernio (recommended): connect the bot's X account once in your
+Zernio dashboard (zernio.com), create a Zernio API key, then run
+`node grok-cloud/scripts/zernio-setup.mjs` with ZERNIO_API_KEY set. It prints
+ZERNIO_ACCOUNT_ID, X_BOT_ID and X_BOT_HANDLE for Vercel. With ZERNIO_API_KEY
+set, the bot finds tags with X search on its @handle, reads threads with
+Zernio's tweet lookup and replies through `POST /v1/posts` with one
+Idempotency-Key per answered post. Zernio holds the X permissions and rotates
+the tokens, so no X developer app, X_ACCESS_TOKEN or x-auth step is needed.
+Limits: X search covers the last 7 days, and Zernio's lookup returns the
+parent post but not quoted posts or media. X usage is billed by Zernio at X's
+pass-through rates.
+
+Direct X sign-in (without Zernio): an OAuth 2.0 user access token expires after about two hours, so
 the bot renews its own. Set X_CLIENT_ID (and X_CLIENT_SECRET for a
 confidential app) and the Upstash variables locally, add
 `http://127.0.0.1:8723/callback` as a callback URL in the X app, then run
