@@ -90,6 +90,7 @@ async function attemptWorker(id){
   if(['perplexity','grok'].includes(job.provider)&&cfg.workers[job.provider].transport!=='cursor'){
    update(id,{invoked:true});let result=await browserResearch(job.provider,job.task+'\n\nContext: '+(job.context||'(none)'),cfg,ROOT);
    if(job.category==='social_research'){result=await enrichSocialPacket(result,cfg,(command,args)=>run(command,args,{env,cwd,onSpawn:p=>update(id,{prepPid:p.pid})}),job.researchScope);const packet={...result};result.answer+='\n\nDeltaRoute evidence check: '+JSON.stringify(result.socialEvidence.assessment)+'\n'+result.socialEvidence.requiredClaimPolicy;update(id,{prepPid:null,researchPacket:packet});}
+   fs.writeFileSync(path.join(JOBS,id,'answer.txt'),String(result.answer||''));
    update(id,{status:'completed',...result,invoked:true,tokenUsage:{available:false,source:'Web interface exposes no token counters',inputTokens:null,outputTokens:null},finishedAt:new Date().toISOString(),usage:'Browser session allowance; no API calls or API-key billing configured.'});return;
   }
   const w=cfg.workers[job.provider];

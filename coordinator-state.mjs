@@ -164,7 +164,8 @@ function locked(root, operation) {
           throw error;
         }
         const grave = path.join(directory, `.coordinator-reaped-${crypto.randomUUID()}`);
-        renameWithRetry(lock, grave);
+        // Already gone: another contender moved it away. Nothing of ours is left in it, so try again.
+        try { renameWithRetry(lock, grave); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
         dispose(grave);
         continue;
       }

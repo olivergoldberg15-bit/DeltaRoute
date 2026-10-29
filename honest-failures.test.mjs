@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {classifyFailure} from './fallback-policy.mjs';
-import {searchBotCheck,SEARCH_BOT_CHECK} from './browser.mjs';
+import {searchBotCheck,SEARCH_BOT_CHECK,searchQuestion,sameTarget,rankPrimaryLinks,replyAfterPrompt,PROMPT_END} from './browser.mjs';
 import {changedPaths,dirtyEntries} from './workflows.mjs';
 import {codeVerdict,researchVerdict} from './smoke.mjs';
 // Failures that used to look like success, or like a different failure, now say what actually happened.
@@ -41,6 +41,28 @@ test('a dirty checkout is refused before any job exists, so no step try is used'
  const r=spawnSync(process.execPath,['server.mjs','--call','submit_task',JSON.stringify({task:'Edit a.txt',cwd:dir,mode:'code'})],{cwd:runtime,encoding:'utf8',windowsHide:true,env:{...process.env,MODEL_ROUTER_WORKER:''}});
  assert.equal(r.status,1);assert.match(r.stderr,/clean Git checkout.*no step try was used/s);
  assert.deepEqual(fs.readdirSync(path.join(runtime,'jobs')).filter(n=>/^[a-f0-9-]{36}$/.test(n)),[]);
+});
+
+test('primary search asks Google the question, not the brief, and keeps the old first choice',()=>{
+ assert.equal(searchQuestion('Study how @grok works. Collect 30 replies.\n\nContext: REQUIRED: read the saved contract {"a":1}'),'Study how @grok works. Collect 30 replies.');
+ assert.equal(searchQuestion('Search the web and find primary sources for this factual question: When was it built?\nRequired primary publisher domains: x.com.'),'When was it built?');
+ assert.equal(searchQuestion(Array.from({length:40},(_,i)=>'w'+i).join(' ')).split(' ').length,32);
+ assert.deepEqual(rankPrimaryLinks([{title:'',url:'https://a.test/x/y'},{title:'T',url:'https://www.google.com/goto?url=1'},{title:'T',url:'https://b.test/p/q'}]).map(l=>l.url),['https://b.test/p/q','https://a.test/x/y','https://www.google.com/goto?url=1']);
+});
+
+test('a research answer is only the reply, never the echoed prompt',()=>{
+ // grok.com, 2026-10-29: the capture began with the question, twice, before Grok's reply.
+ const echo='You\n\nCollect replies. '+PROMPT_END;
+ assert.equal(replyAfterPrompt(echo+'\n\n'+echo+'\n\nGrok\nHere are 24 replies.'),'Grok\nHere are 24 replies.');
+ assert.equal(replyAfterPrompt(echo),'');
+ assert.equal(replyAfterPrompt('Perplexity shows no echo.'),'Perplexity shows no echo.');
+});
+
+test('a timed-out navigation only counts when the tab reached the target',()=>{
+ assert.equal(sameTarget('https://grok.com','https://grok.com/'),true);
+ assert.equal(sameTarget('https://www.google.com/search?q=a%20b','https://www.google.com/search?q=a+b&sei=1'),true);
+ assert.equal(sameTarget('https://www.google.com/search?q=a','https://www.google.com/search?q=b'),false);
+ assert.equal(sameTarget('https://grok.com','not a url'),false);
 });
 
 test('gstack runtime files do not make a checkout dirty; real changes still do',()=>{
