@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# DeltaRoute on a cloud server (Ubuntu 22.04 or 24.04, x86_64 or arm64, e.g. Oracle Cloud's free Ampere server).
-# Installs Node 22, Claude Code, Codex, the Gemini CLI, the Higgsfield CLI, gstack (pinned) with Chromium and
-# DeltaRoute; registers DeltaRoute with Claude Code; sets up Claude Remote Control as an always-on service so the
-# Claude app on a phone drives it; optionally sends all outbound traffic through one WireGuard VPN.
-# It signs into nothing: cloud/signin.sh does each sign-in afterwards. Safe to run again.
+# Sets up DeltaRoute on an Ubuntu cloud server (Oracle Always Free Ampere A1, or any Ubuntu 22.04/24.04, arm64 or
+# x64) so the Claude app on a phone can drive it through `claude remote-control`. It installs the same tools the
+# laptop uses (Node 22, Claude Code, Codex, the Gemini CLI, the Higgsfield CLI, gstack pinned with Chromium),
+# registers DeltaRoute with Claude Code, keeps Remote Control running as a service, optionally sends all outbound
+# traffic through one WireGuard VPN, and runs DeltaRoute's tests here. It signs in to nothing: the owner runs
+# cloud/login.sh afterwards. Safe to run again; an existing config.json is kept.
 set -euo pipefail
 
 GSTACK_COMMIT=a861c00cfac6e2376d26c7d3ba5207cdc5aefc49
@@ -12,9 +13,9 @@ SOURCE="" VPN_CONF="" SESSION="" DRY_RUN=0
 usage() {
   cat <<'EOF'
 bash install.sh [--source <git url or bundle>] [--vpn <wireguard.conf>] [--browser-session <session-state.json>] [--dir <path>] [--dry-run]
-  --source            Where DeltaRoute comes from (send-to-server.ps1 passes a git bundle). Default: the checkout this script is in.
+  --source            Where DeltaRoute comes from (push-to-server.ps1 passes a git bundle). Default: the checkout this script is in.
   --vpn               A WireGuard config (for example from Proton VPN). All outbound traffic leaves through it; SSH stays reachable.
-  --browser-session   gstack's session-state.json from your PC, so Perplexity and Grok start signed in.
+  --browser-session   gstack's session-state.json from the laptop, so Perplexity and Grok start signed in.
   --dir               Install folder (default ~/DeltaRoute).
   --dry-run           Print every step without changing anything.
 EOF
@@ -32,6 +33,7 @@ while [ $# -gt 0 ]; do
 done
 run() { if [ "$DRY_RUN" = 1 ]; then printf '+ %s\n' "$*"; else "$@"; fi; }
 step() { printf '\n== %s\n' "$*"; }
+RUN_USER="${USER:-$(id -un)}"
 if [ "$DRY_RUN" != 1 ]; then
   [ "$(id -u)" -ne 0 ] || { echo "Run this as your normal user; it uses sudo where it needs to." >&2; exit 1; }
   . /etc/os-release 2>/dev/null || true
@@ -41,21 +43,24 @@ export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"
 
 step "System packages"
 run sudo apt-get update -y
-run sudo apt-get install -y git curl ca-certificates unzip python3 ffmpeg build-essential
+run sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y git curl ca-certificates unzip tmux python3 ffmpeg build-essential
 
 step "Node.js 22"
 if [ "$DRY_RUN" = 1 ] || ! node -v 2>/dev/null | grep -qE '^v(2[2-9]|[3-9][0-9])\.'; then
   run bash -c 'curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -'
-  run sudo apt-get install -y nodejs
+  run sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
 fi
 
-step "Command-line tools in your home folder (no sudo)"
+step "Command-line tools in your home folder (no sudo, updates never touch the system)"
+run mkdir -p "$HOME/.npm-global"
 run npm config set prefix "$HOME/.npm-global"
-if [ "$DRY_RUN" != 1 ] && ! grep -q 'npm-global/bin' "$HOME/.profile" 2>/dev/null; then
-  echo 'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"' >> "$HOME/.profile"
-fi
+for rc in "$HOME/.profile" "$HOME/.bashrc"; do
+  if [ "$DRY_RUN" != 1 ] && ! grep -q 'npm-global/bin' "$rc" 2>/dev/null; then
+    echo 'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"' >> "$rc"
+  fi
+done
 run npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli
-run npm install -g @higgsfield/cli || echo "Higgsfield CLI is not available here; image jobs fall back to Codex's image tool."
+run npm install -g @higgsfield/cli || echo "Higgsfield CLI did not install here; image jobs fall back to Codex's image tool."
 
 step "gstack research browser (pinned to ${GSTACK_COMMIT:0:7})"
 command -v bun >/dev/null 2>&1 || run bash -c 'curl -fsSL https://bun.sh/install | bash'
@@ -64,55 +69,43 @@ GS="$HOME/.claude/skills/gstack"
 run git -C "$GS" fetch --quiet origin "$GSTACK_COMMIT"
 run git -C "$GS" checkout --quiet --detach "$GSTACK_COMMIT"
 run bash -c "cd '$GS' && ./setup --quiet </dev/null"
-run sudo env "PATH=$PATH" npx -y playwright install-deps chromium
+run sudo env "PATH=$PATH" npx --yes playwright install-deps chromium
 
 step "DeltaRoute in $DR_DIR"
 SCRIPT_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
 if [ -n "$SOURCE" ]; then
-  if [ -d "$DR_DIR/.git" ]; then run git -C "$DR_DIR" pull --ff-only "$SOURCE" main; else run git clone --branch main "$SOURCE" "$DR_DIR"; fi
+  if [ -d "$DR_DIR/.git" ]; then run git -C "$DR_DIR" pull --ff-only "$SOURCE" main
+  else
+    # A copy without git history (an earlier file-copy push) is replaced; its config, sign-ins and jobs carry over.
+    OLD="" KEEP=()
+    if [ -e "$DR_DIR" ]; then
+      for keep in config.json state jobs; do [ ! -e "$DR_DIR/$keep" ] || KEEP+=("$keep"); done
+      OLD="$DR_DIR.before-$(date +%Y%m%d%H%M%S)"; run mv "$DR_DIR" "$OLD"
+    fi
+    run git clone --branch main "$SOURCE" "$DR_DIR"
+    for keep in "${KEEP[@]}"; do run cp -a "$OLD/$keep" "$DR_DIR/"; done
+  fi
 elif [ -f "$SCRIPT_REPO/server.mjs" ]; then
   DR_DIR="$SCRIPT_REPO"
 else
   echo "No DeltaRoute source: pass --source, or run this from inside a DeltaRoute checkout." >&2; exit 2
 fi
-run bash -c "cd '$DR_DIR' && node setup.mjs --force"
+# Creates config.json the first time; afterwards the server's own settings are kept.
+run bash -c "cd '$DR_DIR' && node setup.mjs"
 # A server has no screen to open the live dashboard on.
 run node -e "const f=process.argv[1],c=JSON.parse(require('fs').readFileSync(f,'utf8'));c.dashboard={...c.dashboard,autoOpen:false};require('fs').writeFileSync(f,JSON.stringify(c,null,2)+'\n',{mode:0o600})" "$DR_DIR/config.json"
+# Same MCP name, hook, instructions and skill as the laptop (install.ps1 there).
 run node "$DR_DIR/install-claude.mjs" --allow-router-tools
 if [ -n "$SESSION" ]; then
   run mkdir -p "$DR_DIR/state/browser"
   run install -m 600 "$SESSION" "$DR_DIR/state/browser/session-state.json"
 fi
 
-step "Claude Remote Control as an always-on service"
-UNIT="$HOME/.config/systemd/user/deltaroute-remote.service"
-if [ "$DRY_RUN" = 1 ]; then echo "+ write $UNIT"; else
-  mkdir -p "$(dirname "$UNIT")"
-  cat > "$UNIT" <<EOF
-[Unit]
-Description=DeltaRoute through Claude Remote Control
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-WorkingDirectory=$DR_DIR
-Environment=PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=$HOME/.npm-global/bin/claude remote-control --name DeltaRoute --spawn worktree
-Restart=on-failure
-RestartSec=15
-
-[Install]
-WantedBy=default.target
-EOF
-fi
-# Keeps your services running after you log out of SSH.
-run sudo loginctl enable-linger "${USER:-$(id -un)}"
-run systemctl --user daemon-reload
-
 if [ -n "$VPN_CONF" ]; then
   step "One constant VPN exit for all outbound traffic"
-  run sudo apt-get install -y wireguard-tools
-  # wg-quick sets DNS through resolvconf; Ubuntu provides it through resolvectl.
+  [ "$DRY_RUN" = 1 ] || [ -f "$VPN_CONF" ] || { echo "VPN config not found: $VPN_CONF" >&2; exit 1; }
+  run sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y wireguard-tools
+  # wg-quick sets DNS through resolvconf; Ubuntu provides that through resolvectl.
   command -v resolvconf >/dev/null 2>&1 || run sudo ln -sf "$(command -v resolvectl || echo /usr/bin/resolvectl)" /usr/local/bin/resolvconf
   # On a rerun, take the VPN down first so the server's own address is read from the normal route.
   run sudo systemctl stop wg-quick@deltaroute 2>/dev/null || true
@@ -130,7 +123,34 @@ if [ -n "$VPN_CONF" ]; then
   fi
 fi
 
+step "Phone access service (claude remote-control, in tmux so it has a terminal)"
+UNIT=/etc/systemd/system/deltaroute-remote.service
+if [ "$DRY_RUN" = 1 ]; then echo "+ write $UNIT"; else
+  sudo tee "$UNIT" >/dev/null <<EOF
+[Unit]
+Description=DeltaRoute phone access (Claude Code Remote Control)
+After=network-online.target ${VPN_CONF:+wg-quick@deltaroute.service}
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=$RUN_USER
+WorkingDirectory=$DR_DIR
+Environment=PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Attach to answer a question it is waiting on: tmux attach -t deltaroute (leave with Ctrl+B then D).
+ExecStart=/usr/bin/tmux new-session -d -s deltaroute "$HOME/.npm-global/bin/claude remote-control --name DeltaRoute"
+ExecStop=/usr/bin/tmux kill-session -t deltaroute
+Restart=always
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target
+EOF
+fi
+run sudo systemctl daemon-reload
+run sudo systemctl enable deltaroute-remote.service
+
 step "Check DeltaRoute runs on this machine"
 run bash -c "cd '$DR_DIR' && npm test"
 
-printf '\nInstalled. Next, sign in to each subscription once:\n  bash %s/cloud/signin.sh\n' "$DR_DIR"
+printf '\nInstalled. Next, sign in to each subscription once:\n  bash %s/cloud/login.sh\n' "$DR_DIR"

@@ -64,11 +64,15 @@ test('install-claude refuses to replace another checkout or a broken marker',()=
 const bash=process.platform==='win32'?['C:/Program Files/Git/bin/bash.exe','C:/Program Files (x86)/Git/bin/bash.exe'].find(p=>fs.existsSync(p)):'bash';
 const sh=args=>spawnSync(bash,args,{cwd:import.meta.dirname,encoding:'utf8',windowsHide:true,env:{...process.env,HOME:path.join(tmp,'shhome')}});
 test('the cloud scripts parse and the installer dry run shows every step',{skip:!bash&&'no bash on this machine'},()=>{
- for(const f of ['cloud/install.sh','cloud/signin.sh']){const r=sh(['-n',f]);assert.equal(r.status,0,f+': '+r.stderr);}
+ for(const f of ['cloud/install.sh','cloud/login.sh']){const r=sh(['-n',f]);assert.equal(r.status,0,f+': '+r.stderr);}
  const plain=sh(['cloud/install.sh','--dry-run','--source','/tmp/deltaroute.bundle']);assert.equal(plain.status,0,plain.stderr);
- for(const want of ['npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli','checkout --quiet --detach a861c00cfac6e2376d26c7d3ba5207cdc5aefc49','./setup --quiet','git clone --branch main /tmp/deltaroute.bundle','node setup.mjs --force','install-claude.mjs --allow-router-tools','deltaroute-remote.service','loginctl enable-linger','npm test'])assert.ok(plain.stdout.includes(want),want);
+ for(const want of ['npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli','checkout --quiet --detach a861c00cfac6e2376d26c7d3ba5207cdc5aefc49','./setup --quiet','git clone --branch main /tmp/deltaroute.bundle','node setup.mjs','install-claude.mjs --allow-router-tools','apt-get install -y git curl ca-certificates unzip tmux','/etc/systemd/system/deltaroute-remote.service','systemctl enable deltaroute-remote.service','npm test'])assert.ok(plain.stdout.includes(want),want);
  assert.doesNotMatch(plain.stdout,/wireguard/);
  const vpn=sh(['cloud/install.sh','--dry-run','--source','/tmp/b','--vpn','/tmp/proton.conf','--browser-session','/tmp/s.json']);assert.equal(vpn.status,0,vpn.stderr);
  for(const want of ['apt-get install -y wireguard-tools','/etc/wireguard/deltaroute.conf','table main priority 100','enable --now wg-quick@deltaroute','state/browser/session-state.json'])assert.ok(vpn.stdout.includes(want),want);
  assert.equal(sh(['cloud/install.sh','--bogus']).status,2);
+ // A server first filled by a plain file copy becomes a git copy and keeps its config, sign-ins and jobs.
+ const old=path.join(tmp,'shhome','Copied');fs.mkdirSync(path.join(old,'state'),{recursive:true});fs.writeFileSync(path.join(old,'config.json'),'{}');
+ const convert=sh(['cloud/install.sh','--dry-run','--source','/tmp/b','--dir',old.split(path.sep).join('/')]);assert.equal(convert.status,0,convert.stderr);
+ assert.match(convert.stdout,/\+ mv \S*Copied \S*Copied\.before-\d{14}/);assert.match(convert.stdout,/\+ cp -a \S*config\.json/);assert.match(convert.stdout,/\+ cp -a \S*state/);
 });
