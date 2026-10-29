@@ -24,6 +24,7 @@ coordinator-health.lock/
 /media-cache/
 /media-source-cache/
 /browser-state/
+.gstack/
 /state/
 /work/
 /test-results/
