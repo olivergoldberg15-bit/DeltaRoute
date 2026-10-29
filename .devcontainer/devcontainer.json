@@ -3,6 +3,8 @@
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
   "hostRequirements": { "cpus": 2, "memory": "8gb" },
   "features": { "ghcr.io/devcontainers/features/sshd:1": { "version": "latest" } },
+  "forwardPorts": [8787],
+  "portsAttributes": { "8787": { "label": "DeltaRoute for connected AIs", "onAutoForward": "silent" } },
   "postCreateCommand": "bash cloud/install.sh",
   "postStartCommand": "bash cloud/remote.sh"
 }

@@ -265,18 +265,22 @@ const tools=[
  {name:'model_registry',description:'Capability registry. roles: best available model per role (chief, op, route_lead, review, simulated_review, agent, sub_agent) for a category. refresh: compare live CLI model lists with the registry and write a proposal. propose: add cited score/tier changes (source_url + source_date). apply: only with approved_by_user quoting the user; news never changes scores alone.',inputSchema:{type:'object',properties:{action:{type:'string',enum:['roles','refresh','propose','apply']},category:{type:'string',enum:categories},proposal_id:{type:'string'},approved_by_user:{type:'string',description:'The user\'s own approval words'},changes:{type:'array',items:{type:'object',properties:{id:{type:'string'},set:{type:'object'},source_url:{type:'string'},source_date:{type:'string'},note:{type:'string'}},required:['id','source_url','source_date']}},additions:{type:'array',items:{type:'object'},description:'Full scored entries for new_model items in the proposal'},rationale:{type:'string'}},required:['action']}},
  {name:'cancel_task',description:'Cancel a queued or running delegated task and its child process. Keep job files and worktree for inspection.',inputSchema:{type:'object',properties:{task_id:{type:'string'}},required:['task_id']}}
 ];
+const PROTOCOLS=['2024-11-05','2025-03-26','2025-06-18'];
+// One MCP JSON-RPC message for any transport: stdio below, HTTP in remote-mcp.mjs. `allow` limits the tools a caller sees and calls.
+export async function handleMessage(msg,{allow=null}={}){
+ if(msg?.id===undefined)return null;
+ let result,error;try{
+  if(msg.method==='initialize')result={protocolVersion:PROTOCOLS.includes(msg.params?.protocolVersion)?msg.params.protocolVersion:PROTOCOLS[0],capabilities:{tools:{}},serverInfo:{name:'DeltaRoute',title:'DeltaRoute (Δ)',version:'1.6.0'}};
+  else if(msg.method==='ping')result={};
+  else if(msg.method==='tools/list')result={tools:allow?tools.filter(t=>allow.includes(t.name)):tools};
+  else if(msg.method==='tools/call'){if(allow&&!allow.includes(msg.params?.name))result={isError:true,content:[{type:'text',text:'This tool is not allowed for this connection'}]};else try{result={content:[{type:'text',text:JSON.stringify(await call(msg.params.name,msg.params.arguments),null,2)}]};}catch(e){result={isError:true,content:[{type:'text',text:e.message}]};}}
+  else error={code:-32601,message:'Method not found'};
+ }catch(e){error={code:-32603,message:e.message};}
+ return {jsonrpc:'2.0',id:msg.id,...(error?{error}:{result})};
+}
 async function serve(){
  const lines=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
- for await(const line of lines){let msg;try{msg=JSON.parse(line);}catch{continue;}if(msg.id===undefined)continue;
-  let result,error;try{
-   if(msg.method==='initialize')result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'DeltaRoute',title:'DeltaRoute (Δ)',version:'1.6.0'}};
-   else if(msg.method==='ping')result={};
-   else if(msg.method==='tools/list')result={tools};
-   else if(msg.method==='tools/call'){try{result={content:[{type:'text',text:JSON.stringify(await call(msg.params.name,msg.params.arguments),null,2)}]};}catch(e){result={isError:true,content:[{type:'text',text:e.message}]};}}
-   else error={code:-32601,message:'Method not found'};
-  }catch(e){error={code:-32603,message:e.message};}
-  process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:msg.id,...(error?{error}:{result})})+'\n');
- }
+ for await(const line of lines){let msg;try{msg=JSON.parse(line);}catch{continue;}const reply=await handleMessage(msg);if(reply)process.stdout.write(JSON.stringify(reply)+'\n');}
 }
 if(process.argv[2]==='--attempt')await attemptWorker(process.argv[3]);
 else if(process.argv[2]==='--worker')await worker(process.argv[3]);
