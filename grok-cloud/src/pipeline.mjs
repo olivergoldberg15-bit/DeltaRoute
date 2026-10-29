@@ -13,7 +13,7 @@ export async function runPost(post,{env=process.env,store,x,provider=callModel,n
  const entry={post_id:post.id,url:`https://x.com/i/status/${post.id}`,author:post.author_id,question:post.text,queries:null,sources:[],candidates:[],winner:null,final_text:null,mode:dryRun(env)?'dry-run':'live',tokens:[],cost:{},asked_at:now.toISOString()};
  const charge=async(providerName,amount)=>{entry.cost[providerName]=(entry.cost[providerName]||0)+amount;await store.add(`spend:${day}`,amount);};
  const withinBudget=async()=> {if(Number(await store.get(`spend:${day}`)||0)>=Number(env.DAILY_SPEND_CAP||10))throw Error('spend_cap');};
- x ||= createX(env,fetchImpl,n=>charge('x',n*config.prices.xRead));
+ x ||= createX(env,fetchImpl,n=>charge('x',n*config.prices.xRead),store);
  const preset=config.presets[env.PRESET||'top'];
  async function call(role,request) {
   await withinBudget();
@@ -64,7 +64,7 @@ export async function poll({env=process.env,store,fetchImpl=fetch,provider=callM
   if(env.KILL_SWITCH==='1'||await store.get('kill_switch')==='1')return {status:'kill_switch'};
   const day=buckets(new Date()).day;
   if(Number(await store.get(`spend:${day}`)||0)>=Number(env.DAILY_SPEND_CAP||10))return {status:'spend_cap'};
-  const x=createX(env,fetchImpl,n=>store.add(`spend:${day}`,n*config.prices.xRead));
+  const x=createX(env,fetchImpl,n=>store.add(`spend:${day}`,n*config.prices.xRead),store);
   const since=await store.get('since_id'), posts=[];
   // First run: remember where the timeline is and answer nothing, so a fresh deploy never replies to old tags.
   if(!since){const first=await x.mentions(null,null,5);if(first.meta?.newest_id)await store.set('since_id',first.meta.newest_id);return {status:'seeded',since_id:first.meta?.newest_id??null};}

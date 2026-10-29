@@ -20,10 +20,18 @@ KILL_SWITCH=1 or Redis kill_switch=1 stops work. ALLOW_LINKS defaults off.
 Do not enable LIVE until the owner approves, X approves AI replies, the account
 has its automation label and its own identity, and dry-run review passes.
 
-Open before LIVE: an OAuth 2.0 user access token expires after about two
-hours, and there is no refresh flow yet. A fixed X_ACCESS_TOKEN is enough for
-dry-run reads; live replies need a refresh-token flow (or OAuth 1.0a signing)
-added first.
+X sign-in: an OAuth 2.0 user access token expires after about two hours, so
+the bot renews its own. Set X_CLIENT_ID (and X_CLIENT_SECRET for a
+confidential app) and the Upstash variables locally, add
+`http://127.0.0.1:8723/callback` as a callback URL in the X app, then run
+`node grok-cloud/scripts/x-auth.mjs` once and approve as the bot account. It
+saves the tokens straight into the store (nothing is printed) and tells you
+X_BOT_ID and X_BOT_HANDLE. With X_CLIENT_ID set in Vercel, each run uses the
+cached access token, renews it from the stored refresh token when it expires,
+saves X's rotated refresh token, and retries once on a 401. Without
+X_CLIENT_ID the fixed X_ACCESS_TOKEN is used, which is enough for dry-run
+reads. The replay script always uses the fixed token so it never rotates the
+deployed bot's refresh token.
 
 The first poll on an empty store only records the newest mention and answers
 nothing, so a fresh deploy never replies to old tags. Media that cannot be
