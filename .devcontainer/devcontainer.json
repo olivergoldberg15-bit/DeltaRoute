@@ -2,6 +2,7 @@
   "name": "DeltaRoute",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
   "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "features": { "ghcr.io/devcontainers/features/sshd:1": { "version": "latest" } },
   "postCreateCommand": "bash cloud/install.sh",
   "postStartCommand": "bash cloud/remote.sh"
 }
