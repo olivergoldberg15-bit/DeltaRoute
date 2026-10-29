@@ -35,6 +35,8 @@ The switches opt into approval for the six local router tools. They do not grant
 
 See [setup and providers](docs/SETUP.md) for prerequisites, sign-in, research, video tools, optional skills, manual MCP setup and troubleshooting.
 
+On Linux or macOS, `node install-claude.mjs --allow-router-tools` does what `install.ps1 -AllowRouterTools` does. To run DeltaRoute on an always-on cloud server and drive it from the Claude app on a phone, see [DeltaRoute in the cloud](cloud/README.md).
+
 ## What routes where
 
 | Work | Default role |

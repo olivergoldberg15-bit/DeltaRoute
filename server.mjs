@@ -39,6 +39,7 @@ const update=(id,data)=>{const prior=readJob(id),job={...prior,...data,updatedAt
 function streamJob(job){try{appendEvent(ROOT,job.workflowRef.id,{type:'job',step:job.workflowRef.stepId,subagent:job.workflowRef.subagentId,taskId:job.id,provider:job.provider,status:job.status,phase:job.phase});refreshDashboard(job.workflowRef.id);}catch{}}
 function refreshDashboard(workflowId){try{return renderDashboard(ROOT,workflowId,readJob,{coordinatorLabel:COORDINATOR_LABEL});}catch{return null;}}
 const alive=pid=>{if(!pid)return false;try{process.kill(pid,0);return true;}catch(e){return e.code==='EPERM';}};
+const OWN_GROUP=process.platform!=='win32';
 
 export function subscriptionEnv(source=process.env){
  const env={...source};
@@ -57,7 +58,7 @@ export function route(category='implementation',workers=available()){
  const reason=category==='image'?'Image jobs run on Nano Banana Pro through your Higgsfield login (priced and capped before generating, reported in credits), with Codex\'s built-in image tool as the no-credit backup. Pass images.outputs; files land in an output folder, no Git checkout needed.':'Configurable task-fit heuristic, not a measured model ranking. The coordinator should adjust for task requirements, explicit user choices, observed results, and availability.';
  return {provider:eligible[0]||null,alternatives:eligible.slice(1),category,learning:{mode:learned.mode,evidence:learned.evidence},reason,coordinator:COORDINATOR_LABEL+' keeps final synthesis, integration, and small direct questions.'};
 }
-function run(command,args,options={}){return new Promise((resolve,reject)=>{const p=spawn(command,args,{windowsHide:true,...options,stdio:['pipe','pipe','pipe']});options.onSpawn?.(p);let stdout='',stderr='';p.stdout.on('data',d=>stdout=(stdout+d).slice(-1000000));p.stderr.on('data',d=>stderr=(stderr+d).slice(-100000));p.on('error',reject);p.on('close',code=>resolve({code,stdout,stderr}));p.stdin.on('error',()=>{});p.stdin.end(options.input||'');});}
+function run(command,args,options={}){return new Promise((resolve,reject)=>{const p=spawn(command,args,{windowsHide:true,detached:OWN_GROUP,...options,stdio:['pipe','pipe','pipe']});options.onSpawn?.(p);let stdout='',stderr='';p.stdout.on('data',d=>stdout=(stdout+d).slice(-1000000));p.stderr.on('data',d=>stderr=(stderr+d).slice(-100000));p.on('error',reject);p.on('close',code=>resolve({code,stdout,stderr}));p.stdin.on('error',()=>{});p.stdin.end(options.input||'');});}
 function git(args,cwd){const r=spawnSync('git',args,{cwd,encoding:'utf8',windowsHide:true});if(r.status!==0)throw Error((r.stderr||r.error?.message||'Git command failed').trim());return r.stdout.trim();}
 function acquireSlot(max){
  for(let i=0;i<max;i++){const dir=path.join(JOBS,'slot-'+i);try{fs.mkdirSync(dir);fs.writeFileSync(path.join(dir,'pid'),String(process.pid));return dir;}catch{try{const pid=Number(fs.readFileSync(path.join(dir,'pid'),'utf8'));if(pid&&!alive(pid)){fs.rmSync(dir,{recursive:true});i--;}}catch{try{if(Date.now()-fs.statSync(dir).mtimeMs>10000&&!fs.existsSync(path.join(dir,'pid'))){fs.rmdirSync(dir);i--;}}catch{}}}}
@@ -127,7 +128,7 @@ async function attemptWorker(id){
    const launch=workerLaunch(w);command=launch.command;args=[...launch.prefix,'-p',prompt,'--approval-mode',job.mode==='code'?'auto_edit':'plan','--output-format','json','--extensions','none'];if(job.model||w.model)args.push('-m',job.model||w.model);
   }else throw Error('This provider is not enabled or implemented.');
   const out=fs.openSync(path.join(JOBS,id,'stdout.log'),'w'),err=fs.openSync(path.join(JOBS,id,'stderr.log'),'w');
-  child=spawn(command,args,{cwd,env,windowsHide:true,stdio:['pipe',out,err]});fs.closeSync(out);fs.closeSync(err);
+  child=spawn(command,args,{cwd,env,windowsHide:true,detached:OWN_GROUP,stdio:['pipe',out,err]});fs.closeSync(out);fs.closeSync(err);
   update(id,{childPid:child.pid,invoked:true});child.stdin.on('error',()=>{});child.stdin.end(job.provider==='codex'?prompt:'');
   timer=setTimeout(()=>{update(id,{status:'timed_out',error:'Worker exceeded time limit'});killTree(child.pid);},cfg.timeoutSeconds*1000);
   const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve);});clearTimeout(timer);
@@ -162,7 +163,7 @@ async function worker(id){
   if(cancelled())return {status:'cancelled',invoked:false};
   const childId=crypto.randomUUID();fs.mkdirSync(path.join(JOBS,childId));
   write(jobFile(childId),{id:childId,parentId:id,provider,model:provider===job.modelProvider?job.model:undefined,category:job.category,task:job.task,context:job.context,cwd:job.cwd,mode:job.mode,baseRef,limits:job.limits,workflowRef:job.workflowRef,mediaOptions:job.mediaOptions,researchScope:job.researchScope,researchPacket:packet,imageSpec:job.imageSpec,invoked:false,status:'queued',createdAt:new Date().toISOString()});
-  const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'--attempt',childId],{windowsHide:true,stdio:'ignore',env:process.env});update(childId,{workerPid:child.pid});
+  const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'--attempt',childId],{windowsHide:true,detached:OWN_GROUP,stdio:'ignore',env:process.env});update(childId,{workerPid:child.pid});
   const deadline=setTimeout(()=>{const active=readJob(childId);killTree(active.childPid);killTree(active.authPid);killTree(active.prepPid);killTree(child.pid);if(readJob(childId).status!=='cancelled')update(childId,{status:'timed_out',error:'Worker exceeded time limit including queue/auth/browser phases',finishedAt:new Date().toISOString()});},(job.limits?.attemptTimeoutSeconds||cfg.fallback?.attemptTimeoutSeconds||cfg.timeoutSeconds)*1000);
   if(cancelled()){clearTimeout(deadline);killTree(child.pid);update(childId,{status:'cancelled'});return {status:'cancelled',id:childId,invoked:false};}
   update(id,{phase:'attempt_'+(index+1)+'_'+provider,activeAttempt:childId,childPid:child.pid});
@@ -188,11 +189,14 @@ function snapshotUsage(j){const read=n=>{try{return fs.readFileSync(path.join(JO
 function stopActiveAttempt(j,status='cancelled'){
  if(!j.activeAttempt)return;try{const active=readJob(j.activeAttempt);if(!['queued','running'].includes(active.status))return;fs.writeFileSync(path.join(JOBS,active.id,'cancelled'),'');const stopped=[active.childPid,active.authPid,active.prepPid,active.workerPid].filter(Boolean).map(killTree).every(Boolean);update(j.id,{terminationConfirmed:stopped});update(active.id,{status,terminationConfirmed:stopped,tokenUsage:active.invoked?snapshotUsage(active):active.tokenUsage,finishedAt:new Date().toISOString()});}catch{}
 }
-function killTree(pid){
+// Windows stops the whole tree with taskkill. On Linux and macOS worker processes start as their own process
+// group (OWN_GROUP), so signalling -pid also stops the programs they launched, which would otherwise keep running.
+export function killTree(pid,{platform=process.platform,kill=(p,s)=>process.kill(p,s),run=spawnSync,isAlive=alive}={}){
  if(!pid)return true;
- if(process.platform==='win32'){const r=spawnSync('taskkill',['/PID',String(pid),'/T','/F'],{windowsHide:true});if(r.status===0)return true;}
- try{process.kill(pid,'SIGKILL');}catch(e){if(e.code==='ESRCH')return true;}
- return !alive(pid);
+ if(platform==='win32'){const r=run('taskkill',['/PID',String(pid),'/T','/F'],{windowsHide:true});if(r.status===0)return true;}
+ else{try{kill(-pid,'SIGKILL');}catch{}}
+ try{kill(pid,'SIGKILL');}catch(e){if(e.code==='ESRCH')return true;}
+ return !isAlive(pid);
 }
 
 async function call(name,a={}){

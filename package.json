@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test.mjs honest-failures.test.mjs registry.test.mjs telemetry.test.mjs fallback-policy.test.mjs failover.test.mjs state-file.test.mjs specialists.test.mjs media-evidence.test.mjs workflows.test.mjs operation-plan.test.mjs review.test.mjs dashboard.test.mjs coordinator-state.test.mjs account-limits.test.mjs coordinator-supervisor.test.mjs routing-memory.test.mjs provider-command.test.mjs setup.test.mjs install-skills.test.mjs image-jobs.test.mjs grok-cloud/test/*.test.mjs",
+    "test": "node --test test.mjs honest-failures.test.mjs registry.test.mjs telemetry.test.mjs fallback-policy.test.mjs failover.test.mjs state-file.test.mjs specialists.test.mjs media-evidence.test.mjs workflows.test.mjs operation-plan.test.mjs review.test.mjs dashboard.test.mjs coordinator-state.test.mjs account-limits.test.mjs coordinator-supervisor.test.mjs routing-memory.test.mjs provider-command.test.mjs setup.test.mjs install-skills.test.mjs image-jobs.test.mjs cloud.test.mjs grok-cloud/test/*.test.mjs",
     "start": "node server.mjs",
     "usage": "node usage-report.mjs",
     "test:process": "node benchmarks/provider-fallback-process-tests.mjs",
