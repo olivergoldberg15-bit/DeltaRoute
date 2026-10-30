@@ -87,5 +87,5 @@ jobs:
             node -e "const c=require('./config.json');if(!c.browser?.command||!require('fs').existsSync(c.browser.command))throw Error('research browser missing');console.log('browser',c.browser.command)"
             # Codex's own sandbox (its bundled bubblewrap) must be able to start, or every Codex job fails here.
             BWRAP="$(find "$HOME/.npm-global/lib/node_modules/@openai" -path '*codex-resources/bwrap' | head -1)"
-            "$BWRAP" --unshare-user --unshare-pid --ro-bind / / --proc /proc --dev /dev true && echo "Codex sandbox can start"
+            "$BWRAP" --unshare-user --unshare-pid --ro-bind / / --proc /proc --dev /dev true && echo "Codex sandbox can start" || exit 1
             bash cloud/remote.sh
