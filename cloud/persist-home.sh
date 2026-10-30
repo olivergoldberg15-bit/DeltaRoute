@@ -4,7 +4,7 @@
 # the home folder links to them. Safe to run again; runs first on every Codespace create.
 set -euo pipefail
 KEEP=/workspaces/.deltaroute-home
-[ -d /workspaces ] || { echo "No /workspaces here; nothing to keep."; exit 0; }
+[ -d /workspaces ] && [ -w /workspaces ] || { echo "No writable /workspaces here; sign-ins stay in the home folder."; exit 0; }
 mkdir -p "$KEEP" && chmod 700 "$KEEP"
 for dir in .codex .claude .gemini .antigravity; do
   src="$HOME/$dir" dst="$KEEP/$dir"

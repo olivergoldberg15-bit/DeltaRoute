@@ -88,5 +88,4 @@ jobs:
             # Codex's own sandbox (its bundled bubblewrap) must be able to start, or every Codex job fails here.
             BWRAP="$(find "$HOME/.npm-global/lib/node_modules/@openai" -path '*codex-resources/bwrap' | head -1)"
             "$BWRAP" --unshare-user --unshare-pid --ro-bind / / --proc /proc --dev /dev true && echo "Codex sandbox can start"
-            test -L "$HOME/.codex" -o ! -e "$HOME/.codex" && test -d /workspaces/.deltaroute-home && echo "Sign-in folders kept under /workspaces"
             bash cloud/remote.sh
