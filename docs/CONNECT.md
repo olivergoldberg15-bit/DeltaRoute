@@ -38,6 +38,11 @@ Credentials Store). Meta does not review custom connectors.
 - It cannot approve plans or reviews, change the model registry, or speak for
   you in any approval. Code jobs are off unless the AI was added with
   `--allow-code`.
+- Full access is your choice per AI: `add-client <name> --full`, or
+  `set-client <name> --full` for one already connected (its key stays the same).
+  It then has every tool and action you have, plan and review approvals and
+  model registry changes included, all made in your name.
+  `set-client <name> --limited` takes that back.
 - It runs work on your subscriptions and can ask workers to read files on that
   machine, so keep keys private and remove any you no longer use.
 

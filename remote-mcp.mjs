@@ -1,10 +1,12 @@
 // DeltaRoute over HTTP (MCP Streamable HTTP, JSON responses), so any MCP-capable AI the owner connects (Meta Muse
 // custom connectors, ChatGPT or Claude connectors, other agents) can use DeltaRoute's tools. Every connected AI has its
 // own key: only its SHA-256 is stored, in state/remote-clients.json (owner-only, never in Git), and removing the
-// client revokes it. A connected AI acts for the owner but never in the owner's name: it cannot approve plans or
-// reviews, change the model registry, or start code jobs unless that client was added with --allow-code.
+// client revokes it. By default a connected AI acts for the owner but never in the owner's name: it cannot approve
+// plans or reviews, change the model registry, or start code jobs unless allowed with --allow-code. --full is the
+// owner's choice to give an AI every tool and action, approvals included, exactly as the owner has them.
 // It listens on 127.0.0.1; a host's port forwarding (GitHub Codespaces) publishes it. No dependencies.
-//   node remote-mcp.mjs add-client <name> [--allow-code]   prints that client's key once
+//   node remote-mcp.mjs add-client <name> [--allow-code | --full]   prints that client's key once
+//   node remote-mcp.mjs set-client <name> --full | --allow-code | --limited   changes access, same key
 //   node remote-mcp.mjs list-clients | remove-client <name>
 //   node remote-mcp.mjs serve [--port 8787]                 endpoint: POST /mcp with Authorization: Bearer <key>
 import http from 'node:http';
@@ -21,12 +23,14 @@ const sha=key=>crypto.createHash('sha256').update(String(key)).digest('hex');
 
 export function loadClients(file=CLIENTS_FILE){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return {};}}
 function saveClients(clients,file){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(clients,null,1)+'\n',{mode:0o600});}
-export function addClient(name,{file=CLIENTS_FILE,allowCode=false}={}){
+const access=({full=false,allowCode=false})=>full?{full:true,tools:null,allowCode:true}:{full:false,tools:REMOTE_TOOLS,allowCode:Boolean(allowCode)};
+export function addClient(name,{file=CLIENTS_FILE,allowCode=false,full=false}={}){
  if(!/^[a-z0-9][a-z0-9_-]{0,39}$/i.test(String(name)))throw Error('Client name: 1-40 letters, digits, - or _');
  const clients=loadClients(file);if(clients[name])throw Error('A client with that name exists; remove it first to issue a new key');
  const key='dr_'+crypto.randomBytes(32).toString('base64url');
- clients[name]={keySha256:sha(key),tools:REMOTE_TOOLS,allowCode:Boolean(allowCode),createdAt:new Date().toISOString()};saveClients(clients,file);return key;
+ clients[name]={keySha256:sha(key),...access({full,allowCode}),createdAt:new Date().toISOString()};saveClients(clients,file);return key;
 }
+export function setClient(name,{file=CLIENTS_FILE,full=false,allowCode=false}={}){const clients=loadClients(file);if(!clients[name])return false;clients[name]={...clients[name],...access({full,allowCode})};saveClients(clients,file);return true;}
 export function removeClient(name,{file=CLIENTS_FILE}={}){const clients=loadClients(file);if(!clients[name])return false;delete clients[name];saveClients(clients,file);return true;}
 export function authorize(header,clients){
  const key=/^Bearer\s+(\S+)$/i.exec(String(header||''))?.[1];if(!key)return null;const digest=Buffer.from(sha(key));
@@ -35,7 +39,7 @@ export function authorize(header,clients){
 }
 // What a connected AI may not do through an allowed tool. Returns the refusal, or null.
 export function refusal(msg,client){
- if(msg?.method!=='tools/call')return null;const {name,arguments:a={}}=msg.params||{};
+ if(client.full||msg?.method!=='tools/call')return null;const {name,arguments:a={}}=msg.params||{};
  if(name==='submit_task'){
   if((a.action||'delegate')!=='delegate')return 'Connected AIs can delegate tasks only; plans, reviews and approvals stay with the owner.';
   if(a.mode==='code'&&!client.allowCode)return 'Code jobs are off for this connection; the owner can allow them with add-client --allow-code.';
@@ -56,7 +60,7 @@ export function createRemoteServer({handle,clientsFile=CLIENTS_FILE}){
    let size=0;const chunks=[];for await(const c of req){size+=c.length;if(size>MAX_BODY)return send(413,{error:'too_large'});chunks.push(c);}
    let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return send(400,{jsonrpc:'2.0',id:null,error:{code:-32700,message:'Parse error'}});}
    const replies=[];
-   for(const msg of Array.isArray(body)?body:[body]){const no=refusal(msg,client);const reply=no?(msg?.id===undefined?null:refused(msg.id,no)):await handle(msg,{allow:client.tools||REMOTE_TOOLS});if(reply)replies.push(reply);}
+   for(const msg of Array.isArray(body)?body:[body]){const no=refusal(msg,client);const reply=no?(msg?.id===undefined?null:refused(msg.id,no)):await handle(msg,{allow:client.full?null:client.tools||REMOTE_TOOLS});if(reply)replies.push(reply);}
    if(!replies.length)return send(202);
    return send(200,Array.isArray(body)?replies:replies[0]);
   }catch{if(!res.headersSent)send(500,{error:'server_error'});}
@@ -65,14 +69,16 @@ export function createRemoteServer({handle,clientsFile=CLIENTS_FILE}){
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [cmd,arg]=process.argv.slice(2);const flag=n=>{const i=process.argv.indexOf(n);return i>0?process.argv[i+1]:undefined;};
- if(cmd==='add-client'){const key=addClient(arg,{allowCode:process.argv.includes('--allow-code')});console.log(`Key for ${arg} (shown once; give it to that AI as: Authorization: Bearer <key>):\n${key}`);}
+ const opts={full:process.argv.includes('--full'),allowCode:process.argv.includes('--allow-code')};
+ if(cmd==='add-client'){const key=addClient(arg,opts);console.log(`Key for ${arg} (shown once; give it to that AI as: Authorization: Bearer <key>):\n${key}`);}
+ else if(cmd==='set-client')console.log(setClient(arg,opts)?`${arg} now has ${opts.full?'full access':opts.allowCode?'limited access with code jobs':'limited access'}; its key is unchanged.`:`No client named ${arg}.`);
  else if(cmd==='remove-client')console.log(removeClient(arg)?`Removed ${arg}; its key no longer works.`:`No client named ${arg}.`);
- else if(cmd==='list-clients'){for(const [n,c] of Object.entries(loadClients()))console.log(`${n}  tools: ${c.tools.join(', ')}  code jobs: ${c.allowCode?'allowed':'off'}  added ${c.createdAt}`);}
+ else if(cmd==='list-clients'){for(const [n,c] of Object.entries(loadClients()))console.log(`${n}  ${c.full?'full access: every tool and action':`tools: ${c.tools.join(', ')}  code jobs: ${c.allowCode?'allowed':'off'}`}  added ${c.createdAt}`);}
  else if(cmd==='serve'){
   if(process.env.MODEL_ROUTER_WORKER)throw Error('Workers cannot serve DeltaRoute');
   const {handleMessage}=await import(pathToFileURL(path.join(ROOT,'server.mjs')).href);
   const port=Number(flag('--port')||process.env.DELTAROUTE_REMOTE_PORT||8787);
   createRemoteServer({handle:handleMessage}).listen(port,'127.0.0.1',()=>console.log(`DeltaRoute MCP endpoint on http://127.0.0.1:${port}/mcp (${Object.keys(loadClients()).length} connected AI(s))`));
  }
- else{console.log('Usage: node remote-mcp.mjs add-client <name> [--allow-code] | remove-client <name> | list-clients | serve [--port 8787]');process.exitCode=2;}
+ else{console.log('Usage: node remote-mcp.mjs add-client <name> [--allow-code | --full] | set-client <name> --full | --allow-code | --limited | remove-client <name> | list-clients | serve [--port 8787]');process.exitCode=2;}
 }

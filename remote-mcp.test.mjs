@@ -45,6 +45,18 @@ test('a connected AI never acts in the owner\'s name or beyond what it was allow
  assert.doesNotMatch((await call('submit_task',{task:'Edit a.txt',cwd:runtime,mode:'code',provider:'codex'},coderKey)).result.content[0].text,/Code jobs are off/);
  assert.equal((await call('list_workers',{})).result.isError,undefined);
 });
+test('full access is the owner\'s choice: every tool and action, and switching keeps the same key',async()=>{
+ const key=remote.addClient('owner-agent',{file:clientsFile});
+ assert.equal((await rpc('tools/list',{},key)).result.tools.length,remote.REMOTE_TOOLS.length);
+ assert.equal(remote.setClient('owner-agent',{file:clientsFile,full:true}),true);
+ assert.equal((await rpc('tools/list',{},key)).result.tools.length,6);
+ const approve=await rpc('tools/call',{name:'submit_task',arguments:{action:'approve_plan',workflow_id:'none',approved_by_user:'Approved'}},key);
+ assert.doesNotMatch(approve.result.content[0].text,/approvals stay with the owner/);
+ assert.equal(remote.setClient('owner-agent',{file:clientsFile}),true);
+ assert.match((await rpc('tools/call',{name:'submit_task',arguments:{action:'approve_plan',workflow_id:'none',approved_by_user:'Approved'}},key)).result.content[0].text,/approvals stay with the owner/);
+ assert.equal(remote.setClient('nobody',{file:clientsFile,full:true}),false);
+ remote.removeClient('owner-agent',{file:clientsFile});
+});
 test('removing a client revokes its key at once',async()=>{
  const key=remote.addClient('temp',{file:clientsFile});assert.equal((await post({jsonrpc:'2.0',id:1,method:'ping'},key)).status,200);
  assert.equal(remote.removeClient('temp',{file:clientsFile}),true);assert.equal((await post({jsonrpc:'2.0',id:1,method:'ping'},key)).status,401);
