@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — a sturdier endpoint for connected AIs
+
+- `GET /health` answers without a key (up, version, uptime only), so a caller
+  can tell a down server from a forwarding fault in one request.
+- Every response DeltaRoute sends carries an `X-DeltaRoute` header; a 404 or
+  502 without it came from the port forwarding, not DeltaRoute.
+- Finished jobs' output files download over HTTP with the same key:
+  `GET /files/<task id>` lists them, `GET /files/<task id>/<file>` sends one.
+  Only files directly inside that job's (or its attempts') `out/` folder.
+- `node remote-mcp.mjs health | call | download <url> ...`: a client that
+  retries forwarding faults and one transient 401, and never resubmits a task.
+- Streamable HTTP: `Mcp-Session-Id` on initialize (nothing kept per session, so
+  restarts never strand a client), `DELETE /mcp`, event-stream replies with
+  keep-alives for clients that accept only a stream, trailing-slash paths.
+- The client list is cached and reloaded when it changes; a failed read keeps
+  the last good copy, and it is now written atomically. Rejected keys are
+  logged with the reason (no key, or key not recognised).
+- `cloud/serve-remote.sh` restarts the endpoint if it exits (Codespaces);
+  `cloud/install.sh` adds a `deltaroute-mcp` systemd service on servers.
+  `cloud/wake.sh` brings a stopped Codespace back from your own computer.
+- `list_workers` shows `lastOutcomeAt`, so an old failure reads as old.
+
 ## Unreleased — image jobs and kept work
 
 - Image category: `submit_task` with `category: image` and `images.outputs`

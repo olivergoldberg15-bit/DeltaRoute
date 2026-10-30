@@ -25,7 +25,8 @@ one immediately.
   `gh codespace ports visibility 8787:public -c <codespace name>`). On another
   server, put an HTTPS proxy in front of `http://127.0.0.1:8787/mcp`.
 - Authentication: API key, sent as the header `Authorization: Bearer <key>`.
-- Transport: MCP Streamable HTTP (JSON responses).
+- Transport: MCP Streamable HTTP (JSON responses; an event stream for clients
+  that accept only that).
 
 For Meta Muse: ask Muse to "create a Custom Connector" for DeltaRoute, and give
 it the address and the key when it asks (Muse keeps the key in its Secure
@@ -47,5 +48,36 @@ Credentials Store). Meta does not review custom connectors.
   machine, so keep keys private and remove any you no longer use.
 
 The endpoint starts with the Codespace (`cloud/remote.sh`) once at least one AI
-is added, and is reachable only while the Codespace is running. To run it by
-hand: `node remote-mcp.mjs serve`.
+is added, and `cloud/serve-remote.sh` restarts it if it exits (log:
+`state/remote-mcp.log`). On a server, `cloud/install.sh` runs it as the
+`deltaroute-mcp` systemd service. It is reachable only while the Codespace or
+server is running. To run it by hand: `node remote-mcp.mjs serve`.
+
+## Getting files back
+
+Image and other output files can be downloaded with the same key:
+
+- `GET /files/<task id>` lists a finished task's output files.
+- `GET /files/<task id>/<file>` sends one.
+
+Or from any computer with Node.js 22 and this repo:
+
+```
+DELTAROUTE_KEY=<key> node remote-mcp.mjs download https://<address> <task id> ./out
+```
+
+## When it does not answer
+
+- `node remote-mcp.mjs health https://<address>` (or open
+  `https://<address>/health`; no key needed). If that fails, the server, the
+  Codespace or the forwarding is down, not your key.
+- Every response from DeltaRoute itself has an `X-DeltaRoute` header. A 404 or
+  502 without it came from GitHub's port forwarding; wait and retry.
+  `node remote-mcp.mjs call https://<address> <tool> '<json>'` does that for
+  you, and never sends a task twice.
+- A stopped Codespace: from your own computer, with the GitHub CLI signed in,
+  `bash cloud/wake.sh [codespace name]` starts it, starts the endpoint, makes
+  port 8787 public again and waits for `/health`.
+- The Codespace address only works while the Codespace runs and its forwarding
+  behaves. For an address that stays up, run DeltaRoute on an always-on server
+  (`cloud/install.sh`) behind an HTTPS proxy.

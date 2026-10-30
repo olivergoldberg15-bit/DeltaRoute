@@ -151,9 +151,33 @@ RestartSec=20
 WantedBy=multi-user.target
 EOF
 fi
+# The endpoint other AIs connect to (docs/CONNECT.md), restarted by systemd if it exits. It starts with the machine;
+# with no connected AI yet it answers only /health.
+MCP_UNIT=/etc/systemd/system/deltaroute-mcp.service
+if [ "$DRY_RUN" = 1 ]; then echo "+ write $MCP_UNIT"; elif [ -d /run/systemd/system ]; then
+  sudo tee "$MCP_UNIT" >/dev/null <<EOF
+[Unit]
+Description=DeltaRoute endpoint for connected AIs (remote-mcp.mjs)
+After=network-online.target ${VPN_CONF:+wg-quick@deltaroute.service}
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$RUN_USER
+WorkingDirectory=$DR_DIR
+Environment=PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=$(command -v node || echo /usr/bin/node) remote-mcp.mjs serve
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+fi
 if [ "$DRY_RUN" = 1 ] || [ -d /run/systemd/system ]; then
   run sudo systemctl daemon-reload
   run sudo systemctl enable deltaroute-remote.service
+  run sudo systemctl enable --now deltaroute-mcp.service
 fi
 
 step "Check DeltaRoute runs on this machine"
