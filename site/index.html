@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeltaRoute — use all your AI subscriptions together</title>
+  <meta name="description" content="DeltaRoute lets Claude hand work to your other AI subscriptions, like ChatGPT Codex, Gemini and Perplexity, so your Claude limit lasts longer.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%232f80ed'>Δ</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#"><span class="delta">Δ</span> DeltaRoute</a>
+    <nav>
+      <a href="#who">Who it's for</a>
+      <a href="#install">Install</a>
+      <a href="#use">How to use</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">Free and open source</p>
+      <h1>Use all your AI subscriptions as one team.</h1>
+      <p class="lead">
+        DeltaRoute lets Claude plan the work and hand the heavy lifting to the other AI apps
+        you already pay for, like ChatGPT Codex, Gemini and Perplexity. Your Claude limit lasts
+        longer, and every result is checked before you see it.
+      </p>
+      <a class="button" id="download" href="https://github.com/olivergoldberg15-bit/DeltaRoute/archive/refs/heads/main.zip">
+        Download DeltaRoute
+      </a>
+      <p class="small">Windows · ZIP file · <a href="https://github.com/olivergoldberg15-bit/DeltaRoute">View on GitHub</a></p>
+    </section>
+
+    <section id="who" class="card">
+      <h2>Who it's for</h2>
+      <ul class="ticks">
+        <li>You pay for Claude <strong>and</strong> at least one other AI, such as ChatGPT, Gemini or Perplexity.</li>
+        <li>You keep hitting your Claude usage limit on big projects.</li>
+        <li>You want bigger jobs (apps, websites, research) planned, split up and reviewed for you.</li>
+        <li>You're on Windows. Mac and Linux work, but take more manual setup.</li>
+      </ul>
+      <p class="note">DeltaRoute doesn't come with any AI accounts or credits. It only uses the apps you already have, signed in the normal way.</p>
+    </section>
+
+    <section id="install" class="card">
+      <h2>Install it, no coding needed</h2>
+      <ol class="steps">
+        <li>
+          <h3>Install the free helpers</h3>
+          <p>Download and run the installers for
+            <a href="https://nodejs.org">Node.js</a> (LTS),
+            <a href="https://git-scm.com/download/win">Git</a> and
+            <a href="https://www.python.org/downloads/">Python</a>.
+            Clicking <em>Next</em> through each one is fine. Also install
+            <a href="https://claude.com/download">Claude</a> with Claude Code.</p>
+        </li>
+        <li>
+          <h3>Download and unzip</h3>
+          <p>Click <strong>Download DeltaRoute</strong> above. Right-click the ZIP, choose
+            <em>Extract All</em>, and put the folder somewhere it can stay, like <em>Documents</em>.</p>
+        </li>
+        <li>
+          <h3>Let Claude set it up</h3>
+          <p>Open Claude Code, choose the DeltaRoute folder you just unzipped, and paste this:</p>
+          <div class="copy">
+            <code id="prompt">Set up DeltaRoute in this folder: run setup.ps1, then install.ps1 -AllowRouterTools, then doctor.ps1, and tell me in plain words if anything needs my attention.</code>
+            <button type="button" id="copy">Copy</button>
+          </div>
+        </li>
+        <li>
+          <h3>Sign in to your other AIs</h3>
+          <p>Sign in to the apps you want to use (like Codex or Gemini) the usual way, then restart Claude. That's it.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="use" class="card">
+      <h2>How to use it</h2>
+      <div class="grid">
+        <div>
+          <h3>Just ask</h3>
+          <p>Talk to Claude like normal. Small questions stay with Claude. For a big job, say
+            <em>"use DeltaRoute"</em>.</p>
+        </div>
+        <div>
+          <h3>Approve the plan</h3>
+          <p>Claude shows you a step-by-step plan and which AI does each part. Nothing starts until you say yes.</p>
+        </div>
+        <div>
+          <h3>Watch and approve</h3>
+          <p>Follow along on a live dashboard. Each step is scored and fixed if it falls short, and you get the final say.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>DeltaRoute is MIT licensed. Not affiliated with Anthropic, OpenAI, Google or Perplexity.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
