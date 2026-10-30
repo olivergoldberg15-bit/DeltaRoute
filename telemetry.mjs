@@ -15,6 +15,7 @@ export function compactJob(job,root,maxAnswer=6000){
  if(job.sourceValidation||job.researchPacket?.sourceValidation)result.sourceValidation=job.sourceValidation||job.researchPacket.sourceValidation;
    if(result.tokenUsage){const {raw,...summary}=result.tokenUsage;result.tokenUsage=summary;}
  if(job.specialistSkills)result.specialistSkills=job.specialistSkills;
+ if(job.retrievedContext)result.retrievedContext=job.retrievedContext;
  if(job.mediaEvidence){const {reportExcerpt,...media}=job.mediaEvidence;result.mediaEvidence=media;}
  if(job.workflowRef)result.workflowRef=job.workflowRef;if(job.scopeAudit){const audit=job.scopeAudit;result.scopeAudit={...audit,changedPaths:audit.changedPaths?.slice(0,40),outside:audit.outside?.slice(0,20),changedPathCount:audit.changedPaths?.length||0,outsidePathCount:audit.outside?.length||0,pathsTruncated:(audit.changedPaths?.length||0)>40||(audit.outside?.length||0)>20};}if(job.limits)result.limits=job.limits;
  if(job.handoff)result.handoff=job.handoff;

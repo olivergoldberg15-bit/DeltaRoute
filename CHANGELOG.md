@@ -24,6 +24,11 @@
 
 ## Unreleased — image jobs and kept work
 
+- Local CLI workers retrieve bounded project instructions, relevant installed
+  skills, project notes and same-project job/process state automatically.
+  Per-attempt context manifests and exact prompt additions make retrieval
+  inspectable through `get_task`; browser services receive no automatic local context.
+
 - Image category: `submit_task` with `category: image` and `images.outputs`
   runs on Nano Banana Pro through the user's Higgsfield login (new `higgsfield`
   worker, off until enabled). Each job is priced before generating, capped per

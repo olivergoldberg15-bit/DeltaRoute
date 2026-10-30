@@ -54,6 +54,12 @@ These are editable starting specialties. Availability and capabilities filter th
 
 Small self-contained tasks stay local because worker startup and repeated context can cost more than they save. Routing is a host policy and tool workflow, not an interceptor that guarantees every chat launches a worker.
 
+Local CLI worker processes automatically receive a bounded context snapshot: applicable project/user instructions, up to three relevant installed skill entry points with excerpts, `BRIEF.md`, `STORYBOARD.md`, optional `.deltaroute/context.md`, recent jobs from the same project, known active worker PIDs, and existing output paths. Discovery checks project and user `.agents/skills`, `.claude/skills`, `.codex/skills`, and the local Codex plugin cache. Skill files do not prove a tool is available. Skills must exist on the machine running DeltaRoute; laptop-only files are not available to a cloud worker.
+
+Each attempt saves `worker-context.json` (source paths, modification times, included-content hashes, truncation flags) and `worker-context.md` (the exact prompt addition). `get_task` reports these paths and a compact `retrievedContext` summary. Prompt context is capped at 24,000 characters; large sources and partial discovery are marked. Manual `context` and workflow contracts remain in force. Chat history is not automatically inherited. For durable project-specific handoffs, save the relevant decisions and artifact paths in `.deltaroute/context.md`.
+
+Retrieval does not read credentials, raw prior prompts/answers, or other projects' jobs, follow skill-directory symlinks outside their roots, run skill scripts, or send this context to browser research/image services. Set `contextRetrieval.enabled` to `false` in local `config.json` to disable it.
+
 ## Long work and recovery
 
 Save the original prompt as a workflow with constraints, non-goals, dependencies, allowed paths and acceptance checks. Workers use pinned Git worktrees. The coordinator reviews real evidence before releasing dependent steps. Failed attempts and counters remain available. Two external workers may run at once; heavy profiles allow bounded 30-minute attempts.

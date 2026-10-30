@@ -4,6 +4,7 @@
   "timeoutSeconds": 900,
   "browser": {"command": "", "stateFile": "", "browsersPath": ""},
   "dashboard": {"autoOpen": true},
+  "contextRetrieval": {"enabled": true},
   "workers": {
     "codex": {"enabled": false, "command": "", "model": null, "capabilities": {"visionFrames": true, "image": "built-in image_generation (ChatGPT plan, no credits)"}, "strengths": ["implementation", "debugging", "tests", "review"]},
     "gemini": {"enabled": false, "command": "", "model": null, "strengths": ["quick_coding", "iteration", "large_context"]},
