@@ -61,7 +61,7 @@ ssh -t -i <path to the key> ubuntu@<server ip> bash ~/DeltaRoute/cloud/login.sh
 
 Open the Claude app, go to Code and pick the session named DeltaRoute. It runs
 on the server with DeltaRoute's tools, so work continues with the laptop off.
-If the service is waiting on a question: `tmux attach -t deltaroute` on the
+If the service is waiting on a question: `tmux attach -t =deltaroute` on the
 server (leave with Ctrl+B then D). Status: `systemctl status deltaroute-remote`.
 
 ## One constant VPN (optional)

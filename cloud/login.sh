@@ -25,8 +25,8 @@ fi
 if [ -d /run/systemd/system ]; then sudo systemctl restart deltaroute-remote.service; else bash "$ROOT/cloud/remote.sh"; fi
 sleep 5
 printf '\n== Phone access\n'
-tmux capture-pane -p -t deltaroute 2>/dev/null | tail -15 || true
-echo "If it is waiting on a question, answer it with:  tmux attach -t deltaroute   (leave with Ctrl+B then D)."
+tmux capture-pane -p -t '=deltaroute:' 2>/dev/null | tail -15 || true
+echo "If it is waiting on a question, answer it with:  tmux attach -t =deltaroute   (leave with Ctrl+B then D)."
 echo "Open the Claude app on your phone, go to Code, and pick the session named DeltaRoute."
 echo "Perplexity and Grok use the browser sessions copied from the laptop (push-to-server.ps1 -BrowserSessions)."
 echo "Check every worker end to end:  cd $ROOT && npm run smoke -- --research"

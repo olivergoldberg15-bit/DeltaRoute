@@ -141,9 +141,9 @@ Type=forking
 User=$RUN_USER
 WorkingDirectory=$DR_DIR
 Environment=PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
-# Attach to answer a question it is waiting on: tmux attach -t deltaroute (leave with Ctrl+B then D).
+# Attach to answer a question it is waiting on: tmux attach -t =deltaroute (leave with Ctrl+B then D).
 ExecStart=/usr/bin/tmux new-session -d -s deltaroute "$HOME/.npm-global/bin/claude remote-control --name DeltaRoute"
-ExecStop=/usr/bin/tmux kill-session -t deltaroute
+ExecStop=/usr/bin/tmux kill-session -t =deltaroute
 Restart=always
 RestartSec=20
 
