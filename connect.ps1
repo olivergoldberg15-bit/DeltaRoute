@@ -2,9 +2,10 @@
 #   powershell -ExecutionPolicy Bypass -File connect.ps1            start the endpoint and the tunnel, print the connector link
 #   powershell -ExecutionPolicy Bypass -File connect.ps1 -AtLogon   also start both whenever you log in to Windows
 #   powershell -ExecutionPolicy Bypass -File connect.ps1 -Stop      stop the endpoint (the tunnel stays configured)
+#   powershell -ExecutionPolicy Bypass -File connect.ps1 -NewLink   replace a lost connector link (the old one stops working)
 # The tunnel is Tailscale Funnel: a fixed https address for this PC that only forwards to DeltaRoute's port.
 # Chats reach DeltaRoute only while this computer is on and awake.
-param([switch]$AtLogon,[switch]$Stop,[int]$Port=8787,[string]$Client='phone')
+param([switch]$AtLogon,[switch]$Stop,[switch]$NewLink,[int]$Port=8787,[string]$Client='phone')
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $MyInvocation.MyCommand.Path
 $node=(Get-Command node -ErrorAction SilentlyContinue).Source
@@ -26,7 +27,8 @@ if(-not (Test-Endpoint)){
 }
 Write-Output "Endpoint running on http://127.0.0.1:$Port (health: /health)."
 
-# One secret link per client, shown once when it is made. Run 'node remote-mcp.mjs remove-client phone' to replace it.
+# One secret link per client, shown once when it is made (only its hash is kept). -NewLink replaces a lost one.
+if($NewLink){& $node (Join-Path $root 'remote-mcp.mjs') remove-client $Client | Out-Null}
 $clients=& $node (Join-Path $root 'remote-mcp.mjs') list-clients
 $link=$null
 if(-not ($clients -match "^$Client\s")){
@@ -43,7 +45,7 @@ if(-not $tailscale){
   $dns=((& $tailscale status --json) | ConvertFrom-Json).Self.DNSName.TrimEnd('.')
   $public="https://$dns"
   if($link){Write-Output "`nYour connector URL (shown once, keep it private like a password):`n$public$link`n"}
-  else{Write-Output "`nPublic address: $public  (your connector URL is this address plus the /c/... link you saved when it was made)`n"}
+  else{Write-Output "`nPublic address: $public  (your connector URL is this address plus the /c/... link shown when it was made; lost it? run connect.ps1 -NewLink)`n"}
   Write-Output 'Add it in Claude: Settings > Connectors > Add custom connector (works in the phone app too).'
   Write-Output 'Add it in ChatGPT: Settings > Connectors > Advanced > Developer mode > Create, with No authentication.'
 }
