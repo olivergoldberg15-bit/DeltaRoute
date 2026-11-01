@@ -234,3 +234,9 @@ test('skills banned by the user\'s rules, deploy skills and weak matches never r
   assert.deepEqual(selectInstalledSkills('Use higgsfield-game-generation', skills, 2, {bannedText: '- No Higgsfield.'}).map(s => s.name), ['higgsfield-game-generation'], 'asked for by name');
   assert.deepEqual(selectInstalledSkills('card game', skills, 2, {blocked: ['higgsfield-*']}).map(s => s.name), []);
 });
+
+test('Muse replies keep only the first answer, without meta.ai page labels', async () => {
+  const {museReply} = await import('./browser.mjs');
+  assert.equal(museReply('Today\nWhich response do you prefer?\nSkip\nResponse 1\n\nFirst answer\n\nI prefer this response\nResponse 2\n\nSecond answer\n\nI prefer this response\nAsk Meta AI...\nInstant'), 'First answer');
+  assert.equal(museReply('A long answer.\nWith two lines.\nAsk Meta AI...\nInstant'), 'A long answer.\nWith two lines.');
+});
