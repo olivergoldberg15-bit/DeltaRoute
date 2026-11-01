@@ -3,104 +3,227 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DeltaRoute — use all your AI subscriptions together</title>
-  <meta name="description" content="DeltaRoute lets Claude hand work to your other AI subscriptions, like ChatGPT Codex, Gemini and Perplexity, so your Claude limit lasts longer.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%232f80ed'>Δ</text></svg>">
+  <title>DeltaRoute: Claude does the work, your other AIs step in</title>
+  <meta name="description" content="DeltaRoute connects the AI subscriptions you already pay for. Claude does the work and hands off only what another AI is clearly better at, like live research to Perplexity or images to Nano Banana Pro.">
+  <meta name="theme-color" content="#f4f0e6">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%232a6196'>Δ</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600&family=Spectral:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="nav">
-    <a class="brand" href="#"><span class="delta">Δ</span> DeltaRoute</a>
-    <nav>
-      <a href="#who">Who it's for</a>
+  <header class="nav wrap">
+    <a class="brand" href="#top"><span class="delta" aria-hidden="true">Δ</span> DeltaRoute</a>
+    <nav aria-label="Sections">
+      <a href="#where">What goes where</a>
+      <a href="#who">Who it’s for</a>
       <a href="#install">Install</a>
       <a href="#use">How to use</a>
     </nav>
   </header>
 
-  <main>
-    <section class="hero">
-      <p class="eyebrow">Free and open source</p>
-      <h1>Use all your AI subscriptions as one team.</h1>
+  <main id="top">
+    <section class="hero wrap">
+      <h1>Claude does the work. Your other AIs step in where they’re better.</h1>
       <p class="lead">
-        DeltaRoute lets Claude plan the work and hand the heavy lifting to the other AI apps
-        you already pay for, like ChatGPT Codex, Gemini and Perplexity. Your Claude limit lasts
-        longer, and every result is checked before you see it.
+        DeltaRoute connects the AI subscriptions you already pay for. Claude keeps the job and hands off
+        only the parts another AI clearly does best: live research with sources to Perplexity, Grok and Muse,
+        and images and video to Nano Banana Pro, ChatGPT, Veo and others. Whatever comes back, Claude checks
+        before you see it.
       </p>
-      <a class="button" id="download" href="https://github.com/olivergoldberg15-bit/DeltaRoute/archive/refs/heads/main.zip">
-        Download DeltaRoute
-      </a>
-      <p class="small">Windows · ZIP file · <a href="https://github.com/olivergoldberg15-bit/DeltaRoute">View on GitHub</a></p>
+      <div class="actions">
+        <a class="button" id="download" href="https://github.com/olivergoldberg15-bit/DeltaRoute/archive/refs/heads/main.zip">Download for Windows</a>
+        <a class="quiet" href="https://github.com/olivergoldberg15-bit/DeltaRoute">See the code on GitHub</a>
+      </div>
+      <p class="fine">Free and open source. Runs on your own PC, and works from Claude Code, the Claude app on your phone, or ChatGPT.</p>
+
+      <figure class="plate">
+        <div class="plate-art">
+          <svg class="map map-wide" viewBox="0 0 1160 440" role="img" aria-labelledby="map-wide-title">
+            <title id="map-wide-title">A request flows through Claude. Live research branches off to Perplexity, Grok and Muse. Images and video branch off to Nano Banana Pro, ChatGPT and Veo. Code branches off to Codex, Gemini and Cursor only when one of them leads. Every branch rejoins Claude before the result comes back to you.</title>
+            <path class="ch" d="M180 220 C250 220 260 84 335 84 H820 C895 84 905 220 975 220"/>
+            <path class="ch" d="M220 220 C285 220 295 370 365 370 H860 C935 370 945 220 1010 220"/>
+            <path class="ch ch-maybe" d="M390 220 C440 220 445 290 495 290 H725 C775 290 780 220 830 220"/>
+            <path class="ch ch-main" d="M24 220 H1136"/>
+
+            <circle class="source" cx="24" cy="220" r="7"/>
+            <circle class="end-ring" cx="1136" cy="220" r="9"/>
+            <circle class="end-dot" cx="1136" cy="220" r="3.5"/>
+            <circle class="town" cx="500" cy="84" r="5"/>
+            <circle class="town" cx="630" cy="84" r="5"/>
+            <circle class="town" cx="740" cy="84" r="5"/>
+            <circle class="town" cx="540" cy="370" r="5"/>
+            <circle class="town" cx="670" cy="370" r="5"/>
+            <circle class="town" cx="780" cy="370" r="5"/>
+            <circle class="town" cx="545" cy="290" r="5"/>
+            <circle class="town" cx="620" cy="290" r="5"/>
+            <circle class="town" cx="695" cy="290" r="5"/>
+
+            <text class="lbl-place" x="16" y="196">Your request</text>
+            <text class="lbl-place" x="1136" y="256" text-anchor="end">Back to you,</text>
+            <text class="lbl-place" x="1136" y="277" text-anchor="end">checked</text>
+
+            <text class="lbl-water lbl-main" x="610" y="174" text-anchor="middle">Claude</text>
+            <text class="lbl-water lbl-sub" x="610" y="202" text-anchor="middle">Planning, writing, design, review and most code</text>
+            <text class="lbl-water" x="350" y="70">Live research, with sources</text>
+            <text class="lbl-water" x="380" y="400">Images and video</text>
+            <text class="lbl-water" x="500" y="276">Code, when another AI leads</text>
+
+            <text class="lbl-town" x="500" y="111" text-anchor="middle">Perplexity</text>
+            <text class="lbl-town" x="630" y="111" text-anchor="middle">Grok</text>
+            <text class="lbl-town" x="740" y="111" text-anchor="middle">Muse</text>
+            <text class="lbl-town" x="545" y="317" text-anchor="middle">Codex</text>
+            <text class="lbl-town" x="620" y="317" text-anchor="middle">Gemini</text>
+            <text class="lbl-town" x="695" y="317" text-anchor="middle">Cursor</text>
+            <text class="lbl-town" x="540" y="352" text-anchor="middle">Nano Banana Pro</text>
+            <text class="lbl-town" x="670" y="352" text-anchor="middle">ChatGPT</text>
+            <text class="lbl-town" x="780" y="352" text-anchor="middle">Veo</text>
+          </svg>
+
+          <svg class="map map-tall" viewBox="0 0 340 624" role="img" aria-labelledby="map-tall-title">
+            <title id="map-tall-title">A request flows through Claude. Live research branches off to Perplexity, Grok and Muse. Images and video branch off to Nano Banana Pro, ChatGPT and Veo. Code branches off to Codex, Gemini and Cursor only when one of them leads. Every branch rejoins Claude before the result comes back to you.</title>
+            <path class="ch" d="M40 160 C40 190 92 182 92 212 V240 C92 270 40 262 40 292"/>
+            <path class="ch" d="M40 304 C40 334 92 326 92 356 V384 C92 414 40 406 40 436"/>
+            <path class="ch ch-maybe" d="M40 448 C40 478 92 470 92 500 V528 C92 558 40 550 40 580"/>
+            <path class="ch ch-main" d="M40 28 V600"/>
+
+            <circle class="source" cx="40" cy="28" r="7"/>
+            <circle class="end-ring" cx="40" cy="600" r="9"/>
+            <circle class="end-dot" cx="40" cy="600" r="3.5"/>
+            <circle class="town" cx="92" cy="226" r="5"/>
+            <circle class="town" cx="92" cy="370" r="5"/>
+            <circle class="town" cx="92" cy="514" r="5"/>
+
+            <text class="lbl-place" x="62" y="34">Your request</text>
+            <text class="lbl-place" x="62" y="606">Back to you, checked</text>
+
+            <text class="lbl-water lbl-main" x="62" y="88">Claude</text>
+            <text class="lbl-water lbl-sub" x="62" y="112">Planning, writing, design,</text>
+            <text class="lbl-water lbl-sub" x="62" y="131">review and most code</text>
+
+            <text class="lbl-water" x="110" y="218">Live research, with sources</text>
+            <text class="lbl-town" x="110" y="242">Perplexity, Grok, Muse</text>
+            <text class="lbl-water" x="110" y="362">Images and video</text>
+            <text class="lbl-town" x="110" y="386">Nano Banana Pro,</text>
+            <text class="lbl-town" x="110" y="406">ChatGPT, Veo</text>
+            <text class="lbl-water" x="110" y="506">Code, when another AI leads</text>
+            <text class="lbl-town" x="110" y="530">Codex, Gemini, Cursor</text>
+          </svg>
+          <div class="wipe" aria-hidden="true"></div>
+        </div>
+        <figcaption>Most of a job stays in Claude’s channel. The parts handed off come back to Claude to check.</figcaption>
+      </figure>
     </section>
 
-    <section id="who" class="card">
-      <h2>Who it's for</h2>
-      <ul class="ticks">
-        <li>You pay for Claude <strong>and</strong> at least one other AI, such as ChatGPT, Gemini or Perplexity.</li>
-        <li>You keep hitting your Claude usage limit on big projects.</li>
-        <li>You want bigger jobs (apps, websites, research) planned, split up and reviewed for you.</li>
-        <li>You're on Windows. Mac and Linux work, but take more manual setup.</li>
-      </ul>
-      <p class="note">DeltaRoute doesn't come with any AI accounts or credits. It only uses the apps you already have, signed in the normal way.</p>
-    </section>
-
-    <section id="install" class="card">
-      <h2>Install it, no coding needed</h2>
-      <ol class="steps">
-        <li>
-          <h3>Install the free helpers</h3>
-          <p>Download and run the installers for
-            <a href="https://nodejs.org">Node.js</a> (LTS),
-            <a href="https://git-scm.com/download/win">Git</a> and
-            <a href="https://www.python.org/downloads/">Python</a>.
-            Clicking <em>Next</em> through each one is fine. Also install
-            <a href="https://claude.com/download">Claude</a> with Claude Code.</p>
-        </li>
-        <li>
-          <h3>Download and unzip</h3>
-          <p>Click <strong>Download DeltaRoute</strong> above. Right-click the ZIP, choose
-            <em>Extract All</em>, and put the folder somewhere it can stay, like <em>Documents</em>.</p>
-        </li>
-        <li>
-          <h3>Let Claude set it up</h3>
-          <p>Open Claude Code, choose the DeltaRoute folder you just unzipped, and paste this:</p>
-          <div class="copy">
-            <code id="prompt">Set up DeltaRoute in this folder: run setup.ps1, then install.ps1 -AllowRouterTools, then doctor.ps1, and tell me in plain words if anything needs my attention.</code>
-            <button type="button" id="copy">Copy</button>
+    <section id="where" class="section wrap">
+      <h2>What goes where</h2>
+      <div class="body">
+        <p>Every request starts with Claude. A part goes somewhere else only when another AI is clearly better at it.</p>
+        <dl class="key">
+          <div class="key-row is-main">
+            <dt>Planning, writing, design, animation, review and most code</dt>
+            <dd>Claude</dd>
           </div>
-        </li>
-        <li>
-          <h3>Sign in to your other AIs</h3>
-          <p>Sign in to the apps you want to use (like Codex or Gemini) the usual way, then restart Claude. That's it.</p>
-        </li>
-      </ol>
+          <div class="key-row">
+            <dt>Live research, with sources</dt>
+            <dd>Perplexity, Grok, Muse</dd>
+          </div>
+          <div class="key-row">
+            <dt>Images and video</dt>
+            <dd>Nano Banana Pro, ChatGPT, Grok Imagine, Seedance, Veo</dd>
+          </div>
+          <div class="key-row is-maybe">
+            <dt>Code, when another AI leads on benchmarks</dt>
+            <dd>Codex, Gemini, Cursor</dd>
+          </div>
+        </dl>
+        <p class="aside">
+          Who counts as better comes from a scoreboard built from public benchmarks. Once a week DeltaRoute
+          reads the latest results and updates the scores in small steps, each one cited and easy to undo.
+          Claude keeps a job unless another AI scores at least 5 points higher.
+        </p>
+      </div>
     </section>
 
-    <section id="use" class="card">
+    <section id="who" class="section wrap">
+      <h2>Who it’s for</h2>
+      <div class="body">
+        <ul class="list">
+          <li>You pay for Claude <strong>and</strong> at least one other AI, such as ChatGPT, Gemini, Perplexity or Grok.</li>
+          <li>You want research with real sources, images or video without leaving your Claude chat.</li>
+          <li>You take on big projects, like apps, websites or videos, and want them planned, split up and reviewed for you.</li>
+          <li>You’re on Windows. Mac and Linux work, but take more manual setup.</li>
+        </ul>
+        <p class="aside">DeltaRoute doesn’t come with any AI accounts or credits. It only uses the apps you already have, signed in the normal way.</p>
+      </div>
+    </section>
+
+    <div class="band">
+      <section id="install" class="section wrap">
+        <h2>Install it, no coding needed</h2>
+        <ol class="steps body">
+          <li>
+            <h3>Install the free helpers</h3>
+            <p>Download and run the installers for
+              <a href="https://nodejs.org">Node.js</a> (LTS),
+              <a href="https://git-scm.com/download/win">Git</a> and
+              <a href="https://www.python.org/downloads/">Python</a>.
+              Clicking <em>Next</em> through each one is fine. Also install
+              <a href="https://claude.com/download">Claude</a> with Claude Code.</p>
+          </li>
+          <li>
+            <h3>Download and unzip</h3>
+            <p>Click <strong>Download for Windows</strong> above. Right-click the ZIP, choose
+              <em>Extract All</em>, and put the folder somewhere it can stay, like <em>Documents</em>.</p>
+          </li>
+          <li>
+            <h3>Let Claude set it up</h3>
+            <p>Open Claude Code, choose the DeltaRoute folder you just unzipped, and paste this:</p>
+            <div class="copy">
+              <code id="prompt">Set up DeltaRoute in this folder: run setup.ps1, then <span class="nowrap">install.ps1 -AllowRouterTools</span>, then doctor.ps1, and tell me in plain words if anything needs my attention.</code>
+              <button type="button" id="copy">Copy</button>
+            </div>
+          </li>
+          <li>
+            <h3>Sign in to your other AIs</h3>
+            <p>Sign in to the apps you want to use (like Codex or Gemini) the usual way, then restart Claude. That’s it.</p>
+          </li>
+        </ol>
+      </section>
+    </div>
+
+    <section id="use" class="section wrap">
       <h2>How to use it</h2>
-      <div class="grid">
+      <div class="body uses">
         <div>
           <h3>Just ask</h3>
-          <p>Talk to Claude like normal. Small questions stay with Claude. For a big job, say
-            <em>"use DeltaRoute"</em>.</p>
+          <p>Talk to Claude like normal. When part of the job needs live research or an image, Claude hands it
+            to the AI that’s best at it. You can also name one: <em>“make this with Nano Banana Pro.”</em></p>
         </div>
         <div>
           <h3>Approve the plan</h3>
-          <p>Claude shows you a step-by-step plan and which AI does each part. Nothing starts until you say yes.</p>
+          <p>For a big job, say <em>“use DeltaRoute”</em>. Claude shows a step-by-step plan and which AI does each
+            part. Nothing starts until you say yes.</p>
         </div>
         <div>
-          <h3>Watch and approve</h3>
-          <p>Follow along on a live dashboard. Each step is scored and fixed if it falls short, and you get the final say.</p>
+          <h3>Watch it come together</h3>
+          <p>Follow along on a live dashboard. The AIs share a team board and can ask each other for help.
+            Each step is scored out of 100 and fixed if it lands under 80, and you get the final say.</p>
+        </div>
+        <div>
+          <h3>Use it from your phone or ChatGPT</h3>
+          <p>Ask Claude to run <code>connect.ps1</code>. It needs <a href="https://tailscale.com/download">Tailscale</a>
+            (free) and prints a private link once. Add that link as a custom connector in the Claude app or ChatGPT.
+            Keep it private, since anyone with it can use your subscriptions. It works while your PC is on.</p>
         </div>
       </div>
     </section>
   </main>
 
-  <footer>
-    <p>DeltaRoute is MIT licensed. Not affiliated with Anthropic, OpenAI, Google or Perplexity.</p>
+  <footer class="footer wrap">
+    <p>DeltaRoute is free and MIT licensed. <a href="https://github.com/olivergoldberg15-bit/DeltaRoute">Source on GitHub</a>.</p>
+    <p>Not affiliated with Anthropic, OpenAI, Google, Perplexity, xAI, Meta or Higgsfield.</p>
   </footer>
 
   <script src="script.js"></script>
