@@ -41,21 +41,31 @@ export function resolveMedia(name, kind = null) {
 }
 
 /** A short safe file name from the prompt. */
-export function mediaFileName(prompt, index, kind) {
+export function mediaFileName(prompt, index, kind, ext = kind === 'video' ? 'mp4' : 'png') {
   const slug = String(prompt).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'media';
-  return `${slug}${index ? '-' + (index + 1) : ''}.${kind === 'video' ? 'mp4' : 'png'}`;
+  return `${slug}${index ? '-' + (index + 1) : ''}.${ext}`;
 }
 
 /** The images.* request an image job takes, built from generate_media's arguments. */
 export function mediaJobSpec(a, target) {
   const count = Math.min(4, Math.max(1, Number(a.count) || 1));
   return {kind: target.kind, ...(target.model ? {model: target.model} : {}), ...(a.deliver_to ? {deliver_to: a.deliver_to} : {}), ...(a.max_credits !== undefined ? {max_credits: a.max_credits} : {}),
-    outputs: Array.from({length: count}, (_, i) => ({file: mediaFileName(a.prompt, count > 1 ? i : 0, target.kind), prompt: a.prompt, aspect_ratio: a.aspect_ratio || (target.kind === 'video' ? '16:9' : '1:1'), resolution: a.resolution || '2k', ...(a.references ? {references: a.references} : {}), ...(target.kind === 'video' && a.duration ? {duration: a.duration} : {})}))};
+    outputs: Array.from({length: count}, (_, i) => ({file: mediaFileName(a.prompt, count > 1 ? i : 0, target.kind, target.via === 'grok' ? 'jpg' : undefined), prompt: a.prompt, aspect_ratio: a.aspect_ratio || (target.kind === 'video' ? '16:9' : '1:1'), resolution: a.resolution || '2k', ...(a.references ? {references: a.references} : {}), ...(target.kind === 'video' && a.duration ? {duration: a.duration} : {})}))};
+}
+
+// Grok Imagine shows each result as an embedded data: JPEG (seen 2026-11-01, 768x1152, two per prompt); some
+// results load from the account's generated/ address instead. imagine-public.x.ai is the public example feed,
+// which keeps loading after the page opens, so it never counts. Small images (avatars, icons) are left out.
+// A key per image (length and tail for data:, the address otherwise) tells new results from what was already there.
+export const GROK_IMAGE_SCAN = '[...document.querySelectorAll("img")].filter(i=>i.naturalWidth>=512&&(i.src.startsWith("data:image/")||/assets\\.grok\\.com\\/users\\/[^/]+\\/generated\\//.test(i.src))).map(i=>i.src.startsWith("data:")?"data:"+i.src.length+":"+i.src.slice(-48):i.src)';
+export function decodeDataImage(src) {
+  const m = /^data:image\/[a-z+]+;base64,(.+)$/s.exec(String(src).trim());
+  return m ? Buffer.from(m[1], 'base64') : null;
 }
 
 /**
- * Grok Imagine on grok.com (experimental). Sends the prompt on /imagine, waits for new generated images, then
- * opens each image's own address so the page can read its bytes same-origin. Returns the files it saved.
+ * Grok Imagine on grok.com (experimental). Sends the prompt on /imagine, waits until its new results stop changing,
+ * then saves the first one: decoded straight from the page when embedded, else read same-origin from its address.
  */
 export async function grokImagine({spec, outDir, cfg, root, timeoutMs = 240000}) {
   fs.mkdirSync(outDir, {recursive: true});
@@ -63,12 +73,14 @@ export async function grokImagine({spec, outDir, cfg, root, timeoutMs = 240000})
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     // gstack prints objects as JSON; a plain string may come back bare.
     const js = async code => { const out = await browse('js', code); try { return JSON.parse(out); } catch { return String(out).trim(); } };
-    const listImages = async () => (await js('[...document.querySelectorAll("img")].map(i=>i.src).filter(s=>/assets\\.grok\\.com\\/users\\//.test(s))'));
+    const listImages = async () => { const r = await js(GROK_IMAGE_SCAN); return Array.isArray(r) ? r : []; };
     const saved = [];
     for (const o of spec.outputs) {
       await goto('https://grok.com/imagine');
       const box = '[role="textbox"][contenteditable="true"]';
       if (!(await browse('wait', box, '25000').then(() => true, () => false))) throw Error('Grok Imagine did not show its prompt box (signed out or the page changed). Run research-login.ps1 grok.');
+      // A cookie banner over the box is answered with Reject All, never Accept, as in research.
+      await js('(()=>{const b=[...document.querySelectorAll("button")].find(b=>/^reject all$/i.test(b.innerText.trim()));if(b)b.click();return "ok"})()');
       const before = new Set(await listImages());
       await browse('fill', box, o.prompt + (o.aspect_ratio && o.aspect_ratio !== '1:1' ? ` (aspect ratio ${o.aspect_ratio})` : ''));
       await browse('press', 'Enter');
@@ -78,18 +90,27 @@ export async function grokImagine({spec, outDir, cfg, root, timeoutMs = 240000})
         await sleep(4000);
         const body = String(await js('document.body.innerText.slice(0,3000)'));
         if (/verify you are human|checking your browser/i.test(body)) throw Error('Grok showed a browser challenge. No bypass attempted.');
-        const now = (await listImages()).filter(s => !before.has(s));
-        stable = now.length && now.length === fresh.length ? stable + 1 : 0;
+        // Out of Imagine allowance, grok.com opens its plans page (#subscribe) instead of generating (seen 2026-11-01).
+        const page = await js('({hash:location.hash,upsell:[...document.querySelectorAll("[role=dialog]")].some(d=>/unlock your creativity with imagine|get plus|upgrade/i.test(d.innerText))})');
+        if (page?.hash === '#subscribe' || page?.upsell) throw Error('Grok Imagine limit reached: grok.com asked to upgrade the plan instead of generating. Nothing was bought. Try again after the limit resets, or use nano banana pro or chatgpt.');
+        // A result can sharpen in place (new key, same count), so stable means the same keys twice in a row.
+        const now = (await listImages()).filter(k => !before.has(k));
+        stable = now.length && now.join('|') === fresh.join('|') ? stable + 1 : 0;
         fresh = now;
         if (stable >= 2) break;
       }
       if (!fresh.length) throw Error('Grok Imagine produced no new image in time; nothing was saved.');
-      await goto(fresh[0]);
-      const b64 = String(await js('(async()=>{const r=await fetch(location.href);const b=new Uint8Array(await r.arrayBuffer());let s="";for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode(...b.subarray(i,i+32768));return btoa(s);})()'));
-      const bytes = Buffer.from(b64, 'base64');
+      let bytes;
+      if (fresh[0].startsWith('data:')) {
+        const src = String(await js(`(()=>{const keys=${GROK_IMAGE_SCAN};const imgs=[...document.querySelectorAll("img")].filter(i=>i.naturalWidth>=512&&(i.src.startsWith("data:image/")||/assets\\.grok\\.com\\/users\\/[^/]+\\/generated\\//.test(i.src)));return imgs[keys.indexOf(${JSON.stringify(fresh[0])})]?.src||""})()`));
+        bytes = decodeDataImage(src) || Buffer.alloc(0);
+      } else {
+        await goto(fresh[0]);
+        bytes = Buffer.from(String(await js('(async()=>{const r=await fetch(location.href);const b=new Uint8Array(await r.arrayBuffer());let s="";for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode(...b.subarray(i,i+32768));return btoa(s);})()')), 'base64');
+      }
       if (!isImageBytes(bytes)) throw Error('Grok Imagine returned something that is not an image');
       fs.writeFileSync(path.join(outDir, o.file), bytes);
-      saved.push({file: o.file, source: fresh[0]});
+      saved.push({file: o.file, source: fresh[0].startsWith('data:') ? 'https://grok.com/imagine' : fresh[0]});
     }
     return saved;
   });

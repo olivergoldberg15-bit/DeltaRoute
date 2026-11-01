@@ -240,3 +240,12 @@ test('Muse replies keep only the first answer, without meta.ai page labels', asy
   assert.equal(museReply('Today\nWhich response do you prefer?\nSkip\nResponse 1\n\nFirst answer\n\nI prefer this response\nResponse 2\n\nSecond answer\n\nI prefer this response\nAsk Meta AI...\nInstant'), 'First answer');
   assert.equal(museReply('A long answer.\nWith two lines.\nAsk Meta AI...\nInstant'), 'A long answer.\nWith two lines.');
 });
+
+test('Grok Imagine results are read from embedded images, and the public example feed never counts', async () => {
+  const {decodeDataImage, GROK_IMAGE_SCAN} = await import('./media.mjs');
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(decodeDataImage('data:image/jpeg;base64,' + jpeg.toString('base64')), jpeg);
+  assert.equal(decodeDataImage('https://assets.grok.com/x.jpg'), null);
+  assert.doesNotMatch(GROK_IMAGE_SCAN, /imagine-public/);
+  assert.match(GROK_IMAGE_SCAN, /naturalWidth>=512/);
+});
