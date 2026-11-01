@@ -2,167 +2,213 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>DeltaRoute: Claude does the work, your other AIs step in</title>
   <meta name="description" content="DeltaRoute connects the AI subscriptions you already pay for. Claude does the work and hands off only what another AI is clearly better at, like live research to Perplexity or images to Nano Banana Pro.">
-  <meta name="theme-color" content="#f4f0e6">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%232a6196'>Δ</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600&family=Spectral:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' font-family='system-ui' font-weight='600'>Δ</text></svg>">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="nav wrap">
-    <a class="brand" href="#top"><span class="delta" aria-hidden="true">Δ</span> DeltaRoute</a>
-    <nav aria-label="Sections">
-      <a href="#where">What goes where</a>
-      <a href="#who">Who it’s for</a>
+  <header class="toolbar">
+    <a class="word" href="#top">
+      <svg class="mark" viewBox="0 0 40 20" aria-hidden="true">
+        <g fill="currentColor">
+          <circle cx="2" cy="10" r="1.7"/><circle cx="7" cy="10" r="1.7"/><circle cx="12" cy="10" r="1.7"/><circle cx="17" cy="10" r="1.7"/>
+          <circle cx="22" cy="10" r="1.7"/><circle cx="27" cy="10" r="1.7"/><circle cx="32" cy="10" r="1.7"/><circle cx="37" cy="10" r="1.7"/>
+          <circle cx="17" cy="7" r="1.2"/><circle cx="22" cy="4.8" r="1.2"/><circle cx="27" cy="3.6" r="1.2" opacity=".7"/><circle cx="32" cy="3.6" r="1.2" opacity=".5"/><circle cx="37" cy="3.6" r="1.2" opacity=".35"/>
+          <circle cx="17" cy="13" r="1.2"/><circle cx="22" cy="15.2" r="1.2"/><circle cx="27" cy="16.4" r="1.2" opacity=".7"/><circle cx="32" cy="16.4" r="1.2" opacity=".5"/><circle cx="37" cy="16.4" r="1.2" opacity=".35"/>
+        </g>
+      </svg>
+      DeltaRoute
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a class="nav-wide" href="#where">What goes where</a>
+      <a class="nav-wide" href="#who">Who it’s for</a>
       <a href="#install">Install</a>
       <a href="#use">How to use</a>
     </nav>
   </header>
 
-  <main id="top">
-    <section class="hero wrap">
-      <h1>Claude does the work. Your other AIs step in where they’re better.</h1>
-      <p class="lead">
-        DeltaRoute connects the AI subscriptions you already pay for. Claude keeps the job and hands off
-        only the parts another AI clearly does best: live research with sources to Perplexity, Grok and Muse,
-        and images and video to Nano Banana Pro, ChatGPT, Veo and others. Whatever comes back, Claude checks
-        before you see it.
-      </p>
-      <div class="actions">
-        <a class="button" id="download" href="https://github.com/olivergoldberg15-bit/DeltaRoute/archive/refs/heads/main.zip">Download for Windows</a>
-        <a class="quiet" href="https://github.com/olivergoldberg15-bit/DeltaRoute">See the code on GitHub</a>
-      </div>
-      <p class="fine">Free and open source. Runs on your own PC, and works from Claude Code, the Claude app on your phone, or ChatGPT.</p>
+  <main id="top" class="page">
+    <section class="hero">
+      <canvas class="lens" id="lens" aria-hidden="true"></canvas>
+      <h1>DeltaRoute</h1>
+      <p>Claude does the work.<br>Your other AIs step in where they’re better.</p>
 
-      <figure class="plate">
-        <div class="plate-art">
-          <svg class="map map-wide" viewBox="0 0 1160 440" role="img" aria-labelledby="map-wide-title">
-            <title id="map-wide-title">A request flows through Claude. Live research branches off to Perplexity, Grok and Muse. Images and video branch off to Nano Banana Pro, ChatGPT and Veo. Code branches off to Codex, Gemini and Cursor only when one of them leads. Every branch rejoins Claude before the result comes back to you.</title>
-            <path class="ch" d="M180 220 C250 220 260 84 335 84 H820 C895 84 905 220 975 220"/>
-            <path class="ch" d="M220 220 C285 220 295 370 365 370 H860 C935 370 945 220 1010 220"/>
-            <path class="ch ch-maybe" d="M390 220 C440 220 445 290 495 290 H725 C775 290 780 220 830 220"/>
-            <path class="ch ch-main" d="M24 220 H1136"/>
-
-            <circle class="source" cx="24" cy="220" r="7"/>
-            <circle class="end-ring" cx="1136" cy="220" r="9"/>
-            <circle class="end-dot" cx="1136" cy="220" r="3.5"/>
-            <circle class="town" cx="500" cy="84" r="5"/>
-            <circle class="town" cx="630" cy="84" r="5"/>
-            <circle class="town" cx="740" cy="84" r="5"/>
-            <circle class="town" cx="540" cy="370" r="5"/>
-            <circle class="town" cx="670" cy="370" r="5"/>
-            <circle class="town" cx="780" cy="370" r="5"/>
-            <circle class="town" cx="545" cy="290" r="5"/>
-            <circle class="town" cx="620" cy="290" r="5"/>
-            <circle class="town" cx="695" cy="290" r="5"/>
-
-            <text class="lbl-place" x="16" y="196">Your request</text>
-            <text class="lbl-place" x="1136" y="256" text-anchor="end">Back to you,</text>
-            <text class="lbl-place" x="1136" y="277" text-anchor="end">checked</text>
-
-            <text class="lbl-water lbl-main" x="610" y="174" text-anchor="middle">Claude</text>
-            <text class="lbl-water lbl-sub" x="610" y="202" text-anchor="middle">Planning, writing, design, review and most code</text>
-            <text class="lbl-water" x="350" y="70">Live research, with sources</text>
-            <text class="lbl-water" x="380" y="400">Images and video</text>
-            <text class="lbl-water" x="500" y="276">Code, when another AI leads</text>
-
-            <text class="lbl-town" x="500" y="111" text-anchor="middle">Perplexity</text>
-            <text class="lbl-town" x="630" y="111" text-anchor="middle">Grok</text>
-            <text class="lbl-town" x="740" y="111" text-anchor="middle">Muse</text>
-            <text class="lbl-town" x="545" y="317" text-anchor="middle">Codex</text>
-            <text class="lbl-town" x="620" y="317" text-anchor="middle">Gemini</text>
-            <text class="lbl-town" x="695" y="317" text-anchor="middle">Cursor</text>
-            <text class="lbl-town" x="540" y="352" text-anchor="middle">Nano Banana Pro</text>
-            <text class="lbl-town" x="670" y="352" text-anchor="middle">ChatGPT</text>
-            <text class="lbl-town" x="780" y="352" text-anchor="middle">Veo</text>
-          </svg>
-
-          <svg class="map map-tall" viewBox="0 0 340 624" role="img" aria-labelledby="map-tall-title">
-            <title id="map-tall-title">A request flows through Claude. Live research branches off to Perplexity, Grok and Muse. Images and video branch off to Nano Banana Pro, ChatGPT and Veo. Code branches off to Codex, Gemini and Cursor only when one of them leads. Every branch rejoins Claude before the result comes back to you.</title>
-            <path class="ch" d="M40 160 C40 190 92 182 92 212 V240 C92 270 40 262 40 292"/>
-            <path class="ch" d="M40 304 C40 334 92 326 92 356 V384 C92 414 40 406 40 436"/>
-            <path class="ch ch-maybe" d="M40 448 C40 478 92 470 92 500 V528 C92 558 40 550 40 580"/>
-            <path class="ch ch-main" d="M40 28 V600"/>
-
-            <circle class="source" cx="40" cy="28" r="7"/>
-            <circle class="end-ring" cx="40" cy="600" r="9"/>
-            <circle class="end-dot" cx="40" cy="600" r="3.5"/>
-            <circle class="town" cx="92" cy="226" r="5"/>
-            <circle class="town" cx="92" cy="370" r="5"/>
-            <circle class="town" cx="92" cy="514" r="5"/>
-
-            <text class="lbl-place" x="62" y="34">Your request</text>
-            <text class="lbl-place" x="62" y="606">Back to you, checked</text>
-
-            <text class="lbl-water lbl-main" x="62" y="88">Claude</text>
-            <text class="lbl-water lbl-sub" x="62" y="112">Planning, writing, design,</text>
-            <text class="lbl-water lbl-sub" x="62" y="131">review and most code</text>
-
-            <text class="lbl-water" x="110" y="218">Live research, with sources</text>
-            <text class="lbl-town" x="110" y="242">Perplexity, Grok, Muse</text>
-            <text class="lbl-water" x="110" y="362">Images and video</text>
-            <text class="lbl-town" x="110" y="386">Nano Banana Pro,</text>
-            <text class="lbl-town" x="110" y="406">ChatGPT, Veo</text>
-            <text class="lbl-water" x="110" y="506">Code, when another AI leads</text>
-            <text class="lbl-town" x="110" y="530">Codex, Gemini, Cursor</text>
-          </svg>
-          <div class="wipe" aria-hidden="true"></div>
+      <div class="command">
+        <div class="segmented" role="radiogroup" aria-label="Kind of work">
+          <label><input type="radio" name="job" value="research" checked><span>Research</span></label>
+          <label><input type="radio" name="job" value="media"><span><span class="full">Images and video</span><span class="short">Media</span></span></label>
+          <label><input type="radio" name="job" value="code"><span>Code</span></label>
+          <label><input type="radio" name="job" value="claude"><span><span class="full">Everything else</span><span class="short">Other</span></span></label>
         </div>
-        <figcaption>Most of a job stays in Claude’s channel. The parts handed off come back to Claude to check.</figcaption>
-      </figure>
-    </section>
 
-    <section id="where" class="section wrap">
-      <h2>What goes where</h2>
-      <div class="body">
-        <p>Every request starts with Claude. A part goes somewhere else only when another AI is clearly better at it.</p>
-        <dl class="key">
-          <div class="key-row is-main">
-            <dt>Planning, writing, design, animation, review and most code</dt>
-            <dd>Claude</dd>
+        <div aria-live="polite">
+          <div class="group" data-job="research">
+            <div class="field"><span>Who</span><b>Perplexity, Grok, Muse</b></div>
+            <div class="field"><span>When</span><b>Always. Answers come back with their sources.</b></div>
           </div>
-          <div class="key-row">
-            <dt>Live research, with sources</dt>
-            <dd>Perplexity, Grok, Muse</dd>
+          <div class="group" data-job="media" hidden>
+            <div class="field"><span>Who</span><b>Nano Banana Pro, ChatGPT, Grok Imagine, Seedance, Veo</b></div>
+            <div class="field"><span>When</span><b>Always. Name a model, or let Claude pick.</b></div>
           </div>
-          <div class="key-row">
-            <dt>Images and video</dt>
-            <dd>Nano Banana Pro, ChatGPT, Grok Imagine, Seedance, Veo</dd>
+          <div class="group" data-job="code" hidden>
+            <div class="field"><span>Who</span><b>Codex, Gemini, Cursor</b></div>
+            <div class="field"><span>When</span><b>Only when one beats Claude by 5 points or more on benchmarks.</b></div>
           </div>
-          <div class="key-row is-maybe">
-            <dt>Code, when another AI leads on benchmarks</dt>
-            <dd>Codex, Gemini, Cursor</dd>
+          <div class="group" data-job="claude" hidden>
+            <div class="field"><span>Who</span><b>Claude</b></div>
+            <div class="field"><span>When</span><b>Always. Planning, writing, design, review and most code stay with Claude.</b></div>
           </div>
-        </dl>
-        <p class="aside">
-          Who counts as better comes from a scoreboard built from public benchmarks. Once a week DeltaRoute
-          reads the latest results and updates the scores in small steps, each one cited and easy to undo.
-          Claude keeps a job unless another AI scores at least 5 points higher.
+        </div>
+
+        <a class="run" id="download" href="https://github.com/olivergoldberg15-bit/DeltaRoute/archive/refs/heads/main.zip">Download for Windows</a>
+        <p class="under">
+          Free and open source. Runs on your own PC, and works from Claude Code, the Claude app on your phone, or ChatGPT.
+          <a href="https://github.com/olivergoldberg15-bit/DeltaRoute">See the code on GitHub</a>
         </p>
       </div>
     </section>
 
-    <section id="who" class="section wrap">
-      <h2>Who it’s for</h2>
-      <div class="body">
-        <ul class="list">
+    <section id="where" class="block">
+      <div class="head">
+        <div>
+          <h2>What goes where</h2>
+          <p class="intro">
+            DeltaRoute connects the AI subscriptions you already pay for. Claude keeps the job and hands off
+            only the parts another AI clearly does best: live research with sources to Perplexity, Grok and Muse,
+            and images and video to Nano Banana Pro, ChatGPT, Veo and others. Whatever comes back, Claude checks
+            before you see it.
+          </p>
+        </div>
+        <dl class="stats">
+          <div><dt>Hand-off margin</dt><dd>5 pts</dd></div>
+          <div><dt>Review pass mark</dt><dd>80</dd></div>
+          <div><dt>Scores checked</dt><dd>Weekly</dd></div>
+        </dl>
+      </div>
+
+      <figure class="card map-card">
+        <figcaption class="map-title">
+          <h3>How a request flows</h3>
+          <p>Most of a job stays in Claude’s channel. The parts handed off come back to Claude to check.</p>
+        </figcaption>
+
+        <svg class="map map-wide" viewBox="0 0 1160 440" role="img" aria-labelledby="map-wide-title">
+          <title id="map-wide-title">A request flows through Claude. Live research branches off to Perplexity, Grok and Muse. Images and video branch off to Nano Banana Pro, ChatGPT and Veo. Code branches off to Codex, Gemini and Cursor only when one of them leads. Every branch rejoins Claude before the result comes back to you.</title>
+          <path class="ch" d="M180 220 C250 220 260 84 335 84 H820 C895 84 905 220 975 220"/>
+          <path class="ch" d="M220 220 C285 220 295 370 365 370 H860 C935 370 945 220 1010 220"/>
+          <path class="ch ch-maybe" d="M390 220 C440 220 445 290 495 290 H725 C775 290 780 220 830 220"/>
+          <path class="ch ch-main" d="M24 220 H1136"/>
+
+          <circle class="source" cx="24" cy="220" r="7"/>
+          <circle class="end-ring" cx="1136" cy="220" r="9"/>
+          <circle class="end-dot" cx="1136" cy="220" r="3.5"/>
+          <circle class="town" cx="500" cy="84" r="5"/>
+          <circle class="town" cx="630" cy="84" r="5"/>
+          <circle class="town" cx="740" cy="84" r="5"/>
+          <circle class="town" cx="540" cy="370" r="5"/>
+          <circle class="town" cx="670" cy="370" r="5"/>
+          <circle class="town" cx="780" cy="370" r="5"/>
+          <circle class="town" cx="545" cy="290" r="5"/>
+          <circle class="town" cx="620" cy="290" r="5"/>
+          <circle class="town" cx="695" cy="290" r="5"/>
+
+          <text class="lbl-place" x="16" y="196">Your request</text>
+          <text class="lbl-place" x="1136" y="256" text-anchor="end">Back to you,</text>
+          <text class="lbl-place" x="1136" y="277" text-anchor="end">checked</text>
+
+          <text class="lbl-ch lbl-main" x="610" y="174" text-anchor="middle">Claude</text>
+          <text class="lbl-ch lbl-sub" x="610" y="202" text-anchor="middle">Planning, writing, design, review and most code</text>
+          <text class="lbl-ch" x="350" y="70">Live research, with sources</text>
+          <text class="lbl-ch" x="380" y="400">Images and video</text>
+          <text class="lbl-ch" x="500" y="276">Code, when another AI leads</text>
+
+          <text class="lbl-town" x="500" y="111" text-anchor="middle">Perplexity</text>
+          <text class="lbl-town" x="630" y="111" text-anchor="middle">Grok</text>
+          <text class="lbl-town" x="740" y="111" text-anchor="middle">Muse</text>
+          <text class="lbl-town" x="545" y="317" text-anchor="middle">Codex</text>
+          <text class="lbl-town" x="620" y="317" text-anchor="middle">Gemini</text>
+          <text class="lbl-town" x="695" y="317" text-anchor="middle">Cursor</text>
+          <text class="lbl-town" x="540" y="352" text-anchor="middle">Nano Banana Pro</text>
+          <text class="lbl-town" x="670" y="352" text-anchor="middle">ChatGPT</text>
+          <text class="lbl-town" x="780" y="352" text-anchor="middle">Veo</text>
+        </svg>
+
+        <svg class="map map-tall" viewBox="0 0 340 624" role="img" aria-labelledby="map-tall-title">
+          <title id="map-tall-title">A request flows through Claude. Live research branches off to Perplexity, Grok and Muse. Images and video branch off to Nano Banana Pro, ChatGPT and Veo. Code branches off to Codex, Gemini and Cursor only when one of them leads. Every branch rejoins Claude before the result comes back to you.</title>
+          <path class="ch" d="M40 160 C40 190 92 182 92 212 V240 C92 270 40 262 40 292"/>
+          <path class="ch" d="M40 304 C40 334 92 326 92 356 V384 C92 414 40 406 40 436"/>
+          <path class="ch ch-maybe" d="M40 448 C40 478 92 470 92 500 V528 C92 558 40 550 40 580"/>
+          <path class="ch ch-main" d="M40 28 V600"/>
+
+          <circle class="source" cx="40" cy="28" r="7"/>
+          <circle class="end-ring" cx="40" cy="600" r="9"/>
+          <circle class="end-dot" cx="40" cy="600" r="3.5"/>
+          <circle class="town" cx="92" cy="226" r="5"/>
+          <circle class="town" cx="92" cy="370" r="5"/>
+          <circle class="town" cx="92" cy="514" r="5"/>
+
+          <text class="lbl-place" x="62" y="34">Your request</text>
+          <text class="lbl-place" x="62" y="606">Back to you, checked</text>
+
+          <text class="lbl-ch lbl-main" x="62" y="88">Claude</text>
+          <text class="lbl-ch lbl-sub" x="62" y="112">Planning, writing, design,</text>
+          <text class="lbl-ch lbl-sub" x="62" y="131">review and most code</text>
+
+          <text class="lbl-ch" x="110" y="218">Live research, with sources</text>
+          <text class="lbl-town" x="110" y="242">Perplexity, Grok, Muse</text>
+          <text class="lbl-ch" x="110" y="362">Images and video</text>
+          <text class="lbl-town" x="110" y="386">Nano Banana Pro,</text>
+          <text class="lbl-town" x="110" y="406">ChatGPT, Veo</text>
+          <text class="lbl-ch" x="110" y="506">Code, when another AI leads</text>
+          <text class="lbl-town" x="110" y="530">Codex, Gemini, Cursor</text>
+        </svg>
+
+        <ul class="legend">
+          <li><i class="sw sw-main"></i>Claude keeps it</li>
+          <li><i class="sw"></i>Handed off</li>
+          <li><i class="sw sw-maybe"></i>Only when another AI leads</li>
+        </ul>
+      </figure>
+    </section>
+
+    <div class="desk">
+      <section class="board" aria-labelledby="key-title">
+        <h2 class="side-title" id="key-title">Who gets which job</h2>
+        <div class="card table">
+          <div class="row th"><span></span><span>Work</span><span>Who</span><span>When</span></div>
+          <div class="row is-main"><i class="sw sw-main"></i><b>Planning, writing, design, animation, review and most code</b><span>Claude</span><span>Always</span></div>
+          <div class="row"><i class="sw"></i><b>Live research, with sources</b><span>Perplexity, Grok, Muse</span><span>Always</span></div>
+          <div class="row"><i class="sw"></i><b>Images and video</b><span>Nano Banana Pro, ChatGPT, Grok Imagine, Seedance, Veo</span><span>Always</span></div>
+          <div class="row"><i class="sw sw-maybe"></i><b>Code</b><span>Codex, Gemini, Cursor</span><span>When one leads Claude on benchmarks</span></div>
+        </div>
+        <p class="foot">
+          Who counts as better comes from a scoreboard built from public benchmarks. Once a week DeltaRoute
+          reads the latest results and updates the scores in small steps, each one cited and easy to undo.
+          Claude keeps a job unless another AI scores at least 5 points higher.
+        </p>
+      </section>
+
+      <section id="who" class="side">
+        <h2 class="side-title">Who it’s for</h2>
+        <ul class="card list">
           <li>You pay for Claude <strong>and</strong> at least one other AI, such as ChatGPT, Gemini, Perplexity or Grok.</li>
           <li>You want research with real sources, images or video without leaving your Claude chat.</li>
           <li>You take on big projects, like apps, websites or videos, and want them planned, split up and reviewed for you.</li>
           <li>You’re on Windows. Mac and Linux work, but take more manual setup.</li>
         </ul>
-        <p class="aside">DeltaRoute doesn’t come with any AI accounts or credits. It only uses the apps you already have, signed in the normal way.</p>
-      </div>
-    </section>
+        <p class="foot">DeltaRoute doesn’t come with any AI accounts or credits. It only uses the apps you already have, signed in the normal way.</p>
+      </section>
+    </div>
 
-    <div class="band">
-      <section id="install" class="section wrap">
-        <h2>Install it, no coding needed</h2>
-        <ol class="steps body">
+    <div class="desk">
+      <section id="install" class="board">
+        <h2 class="side-title">Install it, no coding needed</h2>
+        <ol class="card steps">
           <li>
             <h3>Install the free helpers</h3>
             <p>Download and run the installers for
@@ -191,37 +237,37 @@
           </li>
         </ol>
       </section>
-    </div>
 
-    <section id="use" class="section wrap">
-      <h2>How to use it</h2>
-      <div class="body uses">
-        <div>
-          <h3>Just ask</h3>
-          <p>Talk to Claude like normal. When part of the job needs live research or an image, Claude hands it
-            to the AI that’s best at it. You can also name one: <em>“make this with Nano Banana Pro.”</em></p>
+      <section id="use" class="side">
+        <h2 class="side-title">How to use it</h2>
+        <div class="uses">
+          <div class="card">
+            <h3>Just ask</h3>
+            <p>Talk to Claude like normal. When part of the job needs live research or an image, Claude hands it
+              to the AI that’s best at it. You can also name one: <em>“make this with Nano Banana Pro.”</em></p>
+          </div>
+          <div class="card">
+            <h3>Approve the plan</h3>
+            <p>For a big job, say <em>“use DeltaRoute”</em>. Claude shows a step-by-step plan and which AI does each
+              part. Nothing starts until you say yes.</p>
+          </div>
+          <div class="card">
+            <h3>Watch it come together</h3>
+            <p>Follow along on a live dashboard. The AIs share a team board and can ask each other for help.
+              Each step is scored out of 100 and fixed if it lands under 80, and you get the final say.</p>
+          </div>
+          <div class="card">
+            <h3>Use it from your phone or ChatGPT</h3>
+            <p>Ask Claude to run <code>connect.ps1</code>. It needs <a href="https://tailscale.com/download">Tailscale</a>
+              (free) and prints a private link once. Add that link as a custom connector in the Claude app or ChatGPT.
+              Keep it private, since anyone with it can use your subscriptions. It works while your PC is on.</p>
+          </div>
         </div>
-        <div>
-          <h3>Approve the plan</h3>
-          <p>For a big job, say <em>“use DeltaRoute”</em>. Claude shows a step-by-step plan and which AI does each
-            part. Nothing starts until you say yes.</p>
-        </div>
-        <div>
-          <h3>Watch it come together</h3>
-          <p>Follow along on a live dashboard. The AIs share a team board and can ask each other for help.
-            Each step is scored out of 100 and fixed if it lands under 80, and you get the final say.</p>
-        </div>
-        <div>
-          <h3>Use it from your phone or ChatGPT</h3>
-          <p>Ask Claude to run <code>connect.ps1</code>. It needs <a href="https://tailscale.com/download">Tailscale</a>
-            (free) and prints a private link once. Add that link as a custom connector in the Claude app or ChatGPT.
-            Keep it private, since anyone with it can use your subscriptions. It works while your PC is on.</p>
-        </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </main>
 
-  <footer class="footer wrap">
+  <footer class="footer">
     <p>DeltaRoute is free and MIT licensed. <a href="https://github.com/olivergoldberg15-bit/DeltaRoute">Source on GitHub</a>.</p>
     <p>Not affiliated with Anthropic, OpenAI, Google, Perplexity, xAI, Meta or Higgsfield.</p>
   </footer>
