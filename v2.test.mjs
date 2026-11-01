@@ -249,3 +249,8 @@ test('Grok Imagine results are read from embedded images, and the public example
   assert.doesNotMatch(GROK_IMAGE_SCAN, /imagine-public/);
   assert.match(GROK_IMAGE_SCAN, /naturalWidth>=512/);
 });
+
+test('benchmark changes still parse when Perplexity puts the source link on its own line', () => {
+  const answer = 'Changes:\n{"id":"claude-opus-5-5","capability":"cost_efficiency","direction":"up","points":3,"source_url":"\nhttps://www.anthropic.com/claude/opus\n","source_date":"2026-09-22","note":"Anthropic reports lower pricing."}';
+  assert.deepEqual(parseNewsChanges(answer).map(c => [c.id, c.capability, c.source_url, c.points]), [['claude-opus-5-5', 'cost_efficiency', 'https://www.anthropic.com/claude/opus', 3]]);
+});

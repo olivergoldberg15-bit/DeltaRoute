@@ -27,10 +27,16 @@ export function newsPrompt(registry, {now = new Date()} = {}) {
     'No change without a source you actually read. Do not invent URLs or dates.'].join('\n\n');
 }
 
-/** The change objects in a research answer (one JSON object per line, anywhere in the text). */
+/**
+ * The change objects in a research answer (one JSON object per line, anywhere in the text). Perplexity renders a URL
+ * inside the JSON as a link on its own line ("source_url":"\nhttps://...\n"), which is invalid JSON as written
+ * (2026-11-01: 0 of its changes parsed), so whitespace next to quotes and line breaks are removed first.
+ */
 export function parseNewsChanges(text) {
   const changes = [];
-  for (const m of String(text || '').matchAll(/\{[^{}]*"capability"[^{}]*\}/g)) { try { changes.push(JSON.parse(m[0])); } catch {} }
+  for (const m of String(text || '').matchAll(/\{[^{}]*"capability"[^{}]*\}/g)) {
+    try { changes.push(JSON.parse(m[0].replace(/"\s+/g, '"').replace(/\s+"/g, '"').replace(/[\r\n]+/g, ' '))); } catch {}
+  }
   return changes;
 }
 
