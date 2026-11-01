@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 const BEGIN='<!-- subscription-worker-router:start -->',END='<!-- subscription-worker-router:end -->';
-export const ROUTER_TOOLS=['list_workers','recommend_route','submit_task','get_task','cancel_task','model_registry'].map(t=>'mcp__subscription-router__'+t);
+export const ROUTER_TOOLS=['list_workers','recommend_route','generate_media','submit_task','get_task','cancel_task','model_registry'].map(t=>'mcp__subscription-router__'+t);
 const render=(text,root,skillPath)=>text.split('__DELTAROUTE_ROOT__').join(root).split('{{DELTAROUTE_ROOT}}').join(root).split('{{DELTAROUTE_SKILL_PATH}}').join(skillPath);
 const readJSON=file=>fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):{};
 export function mergeRoutingBlock(existing,block){

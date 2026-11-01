@@ -51,7 +51,7 @@ $entry=[pscustomobject]@{hooks=@([pscustomobject]@{type='command';command=$hookC
 $settings.hooks | Add-Member -NotePropertyName UserPromptSubmit -NotePropertyValue (@($prior)+@($entry)) -Force
 if($AllowRouterTools){
   if(-not $settings.permissions){$settings | Add-Member -NotePropertyName permissions -NotePropertyValue ([pscustomobject]@{}) -Force}
-  $routerTools=@('list_workers','recommend_route','submit_task','get_task','cancel_task','model_registry') | ForEach-Object {'mcp__subscription-router__'+$_}
+  $routerTools=@('list_workers','recommend_route','generate_media','submit_task','get_task','cancel_task','model_registry') | ForEach-Object {'mcp__subscription-router__'+$_}
   $allowed=@($settings.permissions.allow | Where-Object {$_})+@($routerTools)
   $settings.permissions | Add-Member -NotePropertyName allow -NotePropertyValue @($allowed | Select-Object -Unique) -Force
 }
@@ -68,3 +68,6 @@ Get-ChildItem -LiteralPath $dest -Filter '*.md' -File -Recurse | ForEach-Object 
   [IO.File]::WriteAllText($_.FullName,$rendered,[Text.UTF8Encoding]::new($false))
 }
 Write-Output 'DeltaRoute installed for Claude Code with a routing hook and native skill. Restart Claude Code. Existing deny rules remain in force.'
+# Which subscriptions are signed in (no model request), so setup ends with a clear to-do list.
+& $nodePath (Join-Path $routerRoot 'signins.mjs')
+Write-Output 'Next: run npm run smoke for one tiny real job per worker, and connect.ps1 to use DeltaRoute from Claude or ChatGPT chats.'

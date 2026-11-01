@@ -1,5 +1,28 @@
 # Connect other AIs to DeltaRoute
 
+## Your own Claude and ChatGPT chats (phone included)
+
+On the computer that runs DeltaRoute:
+
+```
+powershell -ExecutionPolicy Bypass -File connect.ps1 -AtLogon
+```
+
+It starts DeltaRoute's endpoint on `127.0.0.1:8787`, publishes it with Tailscale Funnel (install Tailscale and sign in
+once; the address never changes), and prints a secret connector link once, like
+`https://<your-pc>.<tailnet>.ts.net/c/l.../mcp`. `-AtLogon` starts both whenever you log in to Windows.
+
+- Claude (web, desktop, phone): Settings > Connectors > Add custom connector, paste the link. Connectors you add sync
+  to the phone app.
+- ChatGPT: Settings > Connectors > Advanced > Developer mode, create a connector with the link and No authentication.
+
+The link is the credential: anyone with it can use your subscriptions, so keep it private.
+`node remote-mcp.mjs remove-client phone` revokes it; `connect.ps1` then makes a new one. A link connection can
+generate media, research and delegate; plan and review approvals stay in Claude Code. Chats reach DeltaRoute only while
+this computer is on and awake.
+
+## Other AIs with a key
+
 Any AI that can use an MCP server over HTTP (Meta Muse custom connectors,
 ChatGPT or Claude connectors, other agents) can send work to DeltaRoute. Each
 one gets its own key, and you can add or remove them at any time.

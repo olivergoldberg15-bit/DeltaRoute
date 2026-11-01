@@ -1,5 +1,49 @@
 # Changelog
 
+## 2.0.0: Claude first, chats everywhere, agents that talk and see
+
+From the episode 1 report (rated 7/10) and Oliver's drawing of interconnected agents.
+
+- **Claude first.** Claude keeps work unless a worker scores at least 5 points higher in the registry
+  (`delegation.margin`). Live research, images, video and video frames always go out. `submit_task` with provider
+  `auto` refuses work Claude keeps; naming a provider still sends it.
+- **Live benchmarks.** Once a week a research job (Perplexity, Grok or Muse) reads recent benchmarks and release news,
+  and cited changes apply on their own: at most 10 points per score, only from pages the research visited, dated
+  within 60 days, logged and undoable (`model_registry` `undo`, `news` to check now). Changes show in `registryNews`.
+- **Muse** (Meta AI on meta.ai) joins Perplexity and Grok as an experimental research worker in the gstack browser.
+- **`generate_media`** (the seventh tool): images and video by plain model name: Nano Banana Pro and any Higgsfield
+  model (credits, priced and capped; video too), ChatGPT through Codex (no credits), Grok Imagine on grok.com
+  (experimental). No silent fallback to another platform. Several images generate at once. Results carry small
+  previews the chat can see, and download links over the connector.
+- **Chats everywhere, on this computer.** `connect.ps1` starts the endpoint, opens a Tailscale Funnel and prints a
+  secret connector link (`add-client <name> --link`) for Claude chats (phone included) and ChatGPT, whose connector
+  screens take only a URL. The Codespace and cloud server setups stay optional and off.
+- **Team board.** Workers on a job share a board (`.deltaroute/outbox/` in, `.deltaroute/board.md` out), post notes
+  and questions, and ask any AI for help; DeltaRoute launches each helper at once and posts its answer back. Chief can
+  `post` too, and `get_task` on a workflow shows the board.
+- **Disposable monitors.** Every few minutes a fresh Grok chat (Gemini Flash if Grok is busy, a no-model rule for
+  plain stalls) judges a running worker from a progress snapshot. Off-track verdicts leave `.deltaroute/NUDGE.md`, post
+  to the board and flag the job; monitors never stop a worker.
+- **Workers see their work.** A worker writes `.deltaroute/render/<name>.json`; DeltaRoute renders the stills outside
+  the sandbox (Remotion, a plain HTML page, or `render.command`) into one contact sheet. The final stills get a cheap
+  Gemini Flash first look (`preReview`, advice only). `render_stills` gives Chief one sheet instead of many frames.
+- **Time limits that hold.** Wall-clock watchdogs replace single long timers, which counted only awake time (Gemini's
+  30-minute limit stopped it at 50). At 80% the worker gets `.deltaroute/WRAP_UP` and saves its progress.
+- **Commit-free integration.** Every code attempt ends as `change.patch`, made outside the sandbox; `apply_patch`
+  applies it without a commit. Scope audits read the patch, and a coordinator finish is audited on that step alone
+  (`integrated_from`), not on the whole project.
+- **Skill picking.** At most two skills, stronger matches only, never deploy/publish skills, never a skill the
+  project's rules ban ("No Higgsfield"), plus `contextRetrieval.blockedSkills`.
+- **Honest savings.** Claude's own tokens are read from Claude Code's transcripts: `list_workers` with
+  `include_usage` and `npm run savings` (writes `state/savings.html`, per project) give one share of fresh tokens that
+  ran off the Claude plan. Since 2026-10-31 that share was 14.9%.
+- **Light plans** for creative phases (approved in one call, `revise_plan` keeps unchanged steps), **templates**
+  (animated_explainer, feature_tests, research_report), and `node signins.mjs [--smoke]` for sign-in checks.
+- **Faster, fewer tokens.** Reasoning effort per category (low for small jobs), four workers at once by default,
+  `node_modules` linked into worktrees, a context packet capped at 12,000 characters (was 24,000), a shorter worker
+  preamble, prompt hook and tool definitions, and compact JSON tool replies.
+- AGENTS.md: seven stable tool names; workers reach other AIs only through the board.
+
 ## Unreleased — a sturdier endpoint for connected AIs
 
 - `GET /health` answers without a key (up, version, uptime only), so a caller

@@ -51,7 +51,7 @@ test('full access is the owner\'s choice: every tool and action, and switching k
  const key=remote.addClient('owner-agent',{file:clientsFile});
  assert.equal((await rpc('tools/list',{},key)).result.tools.length,remote.REMOTE_TOOLS.length);
  assert.equal(remote.setClient('owner-agent',{file:clientsFile,full:true}),true);
- assert.equal((await rpc('tools/list',{},key)).result.tools.length,6);
+ assert.equal((await rpc('tools/list',{},key)).result.tools.length,7);
  const approve=await rpc('tools/call',{name:'submit_task',arguments:{action:'approve_plan',workflow_id:'none',approved_by_user:'Approved'}},key);
  assert.doesNotMatch(approve.result.content[0].text,/approvals stay with the owner/);
  assert.equal(remote.setClient('owner-agent',{file:clientsFile}),true);

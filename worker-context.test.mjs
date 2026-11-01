@@ -45,7 +45,10 @@ test('finds project ancestor rules, system skills and nested plugin skills witho
   const cache = path.join(f.home, '.codex', 'plugins', 'cache'); skill(path.join(cache, 'publisher', 'plugin', '1.0', 'skills'), 'drawing', 'Generate an image.');
   const p = buildWorkerContext({...f, cwd: nested, task: 'Use $imagegen to generate an image'});
   assert.match(formatWorkerContext(p), /ROOT_RULE/); assert.match(formatWorkerContext(p), /NESTED_RULE/);
-  assert.equal(p.skills[0].name, 'imagegen'); assert.ok(p.skills.some(s => s.name === 'drawing'));
+  assert.equal(p.skills[0].name, 'imagegen');
+  // The nested plugin skill is found, but two shared description words are too weak a match to send it to a worker.
+  assert.ok(discoverSkills([path.join(f.home, '.codex', 'plugins', 'cache')]).skills.some(s => s.name === 'drawing'));
+  assert.ok(!p.skills.some(s => s.name === 'drawing'));
   const nearest = buildWorkerContext({...f, cwd: nested, task: 'Use $custom'});
   assert.match(nearest.skills[0].content, /NEAREST_SKILL/);
   const scratch = path.join(f.root, 'scratch'); fs.mkdirSync(scratch); fs.mkdirSync(path.join(scratch, '.git'));

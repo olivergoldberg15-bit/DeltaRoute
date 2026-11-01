@@ -3,8 +3,9 @@
  * role in the Chief > OP > route lead > agent > sub-agent tree goes to the best available
  * model whose tier allows it. Shipped defaults live in models.json; approved local changes
  * live in routing-memory/model-registry.json so a reinstall cannot wipe them.
- * News never changes a score directly: refresh writes a proposal, and only an apply that
- * quotes the user's approval changes the registry.
+ * A weekly benchmark check (benchmark-news.mjs) applies cited score changes on its own, in small capped
+ * steps, each logged and undoable. Bigger edits (tiers, new models) still go through propose and an apply
+ * that quotes the user's approval.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,7 +40,7 @@ const AGENT_WEIGHTS = {
   summarization: {large_context: .4, speed: .4, cost_efficiency: .2},
 };
 const DEFAULT_AGENT = {coding: .7, review: .1, cost_efficiency: .2};
-const RESEARCH_ONLY = new Set(['perplexity', 'grok']);
+const RESEARCH_ONLY = new Set(['perplexity', 'grok', 'muse']);
 
 const localFile = root => path.join(root, 'routing-memory', 'model-registry.json');
 const proposalFile = (root, id) => {
@@ -108,6 +109,93 @@ export function assignRole(registry, role, {category = 'implementation', coordin
 
 export function assignRoles(registry, options = {}) {
   return Object.fromEntries(Object.keys(ROLES).map(role => [role, assignRole(registry, role, options)]));
+}
+
+// Claude first: the host keeps the work unless a worker is clearly better at this kind of work (Oliver, 2026-11-01).
+export const CAPABILITY_FOR = {implementation: 'coding', quick_coding: 'coding', iteration: 'coding', debugging: 'coding', tests: 'coding', frontend: 'visual', creative: 'visual', review: 'review', planning: 'planning', simple: 'planning', large_context: 'large_context', summarization: 'large_context'};
+
+/** keep=true when the host's score for this category is within `margin` of the best available worker's. */
+export function delegationVerdict(registry, {category = 'implementation', coordinator = 'claude', workers = [], margin = 5} = {}) {
+  const capability = CAPABILITY_FOR[category] || 'coding';
+  const host = registry.models.filter(m => m.provider === coordinator).sort((a, b) => b.scores[capability] - a.scores[capability])[0];
+  if (!host) return {keep: false, capability, reason: 'The host is not in the registry; use the worker ranking.'};
+  const best = registry.models.map(m => ({m, a: availability(m, {coordinator, workers, live: registry.live})}))
+    .filter(({m, a}) => a.available && a.execution === 'worker' && !RESEARCH_ONLY.has(m.provider))
+    .sort((x, y) => y.m.scores[capability] - x.m.scores[capability])[0]?.m;
+  if (!best) return {keep: true, capability, reason: `No worker is available for ${capability}; ${host.label} does it.`};
+  const gap = best.scores[capability] - host.scores[capability];
+  return gap >= margin
+    ? {keep: false, capability, worker: best.id, provider: best.provider, gap, reason: `${best.label} scores ${best.scores[capability]} on ${capability} against ${host.label}'s ${host.scores[capability]}: delegate.`}
+    : {keep: true, capability, bestWorker: best.id, gap, reason: `${host.label} scores ${host.scores[capability]} on ${capability}; the best worker (${best.label}) scores ${best.scores[capability]}. ${host.label} keeps it (a worker must lead by ${margin} or more).`};
+}
+
+const changesFile = root => path.join(root, 'routing-memory', 'registry-changes.jsonl');
+
+/**
+ * Applies cited benchmark changes on their own (Oliver chose auto-apply, 2026-11-01). Each change moves one score by
+ * at most maxStep points, needs a source URL and a date no older than maxAgeDays, and is logged with an id for undo.
+ * A source must be on a site the research job actually visited, so an invented link cannot move a score.
+ */
+export function applyBenchmarkChanges(root, changes, {taskId = null, visitedHosts = null, maxStep = 10, maxAgeDays = 60, now = Date.now()} = {}) {
+  const local = readJSON(localFile(root), {models: [], removed: [], live: {}});
+  const current = new Map(loadRegistry(root).models.map(m => [m.id, m]));
+  const applied = [], skipped = [], touched = new Set();
+  for (const c of Array.isArray(changes) ? changes : []) {
+    const why = (() => {
+      if (!current.has(c?.id)) return 'unknown model';
+      if (!CAPABILITIES.includes(c.capability)) return 'unknown capability';
+      if (touched.has(c.id + '|' + c.capability)) return 'one change per score per check';
+      let host;
+      try { host = new URL(c.source_url).hostname.replace(/^www\./, ''); } catch { return 'no valid source_url'; }
+      if (!/^https?:/.test(c.source_url)) return 'no valid source_url';
+      if (visitedHosts && !visitedHosts.some(h => host === h || host.endsWith('.' + h) || h.endsWith('.' + host))) return 'source not among the pages the research visited';
+      const age = (now - Date.parse(c.source_date)) / 86_400_000;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(c.source_date || '') || !(age >= -1 && age <= maxAgeDays)) return `source date missing or older than ${maxAgeDays} days`;
+      const points = Math.round(Number(c.points));
+      if (!(points >= 1) || !['up', 'down'].includes(c.direction)) return 'direction up/down and points 1+ needed';
+      return null;
+    })();
+    if (why) { skipped.push({id: c?.id, capability: c?.capability, why}); continue; }
+    const model = current.get(c.id), from = model.scores[c.capability];
+    const step = Math.min(maxStep, Math.round(Number(c.points)));
+    const to = Math.max(0, Math.min(100, from + (c.direction === 'up' ? step : -step)));
+    if (to === from) { skipped.push({id: c.id, capability: c.capability, why: 'already at the limit'}); continue; }
+    const next = {...model, scores: {...model.scores, [c.capability]: to}};
+    local.models = [...(local.models || []).filter(x => x.id !== c.id), next];
+    current.set(c.id, next); touched.add(c.id + '|' + c.capability);
+    const change = {changeId: crypto.randomUUID().slice(0, 8), at: new Date(now).toISOString(), id: c.id, capability: c.capability, from, to, source_url: c.source_url, source_date: c.source_date, note: String(c.note || '').slice(0, 300), taskId};
+    applied.push(change);
+  }
+  if (applied.length) {
+    local.updatedAt = new Date(now).toISOString().slice(0, 10);
+    fs.mkdirSync(path.dirname(localFile(root)), {recursive: true});
+    atomicWriteJSON(localFile(root), local);
+    fs.appendFileSync(changesFile(root), applied.map(c => JSON.stringify(c)).join('\n') + '\n');
+  }
+  return {applied, skipped};
+}
+
+/** Reverses one auto-applied change, if that score has not moved since. */
+export function undoBenchmarkChange(root, changeId) {
+  let log = [];
+  try { log = fs.readFileSync(changesFile(root), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch {}
+  const change = log.find(c => c.changeId === changeId && !c.undone);
+  if (!change || log.some(c => c.changeId === changeId && c.undone)) throw Error('No auto-applied change with that id (or it was already undone)');
+  const local = readJSON(localFile(root), {models: [], removed: [], live: {}});
+  const model = loadRegistry(root).models.find(m => m.id === change.id);
+  if (!model || model.scores[change.capability] !== change.to) throw Error('That score has changed since; edit it with propose/apply instead');
+  local.models = [...(local.models || []).filter(x => x.id !== change.id), {...model, scores: {...model.scores, [change.capability]: change.from}}];
+  atomicWriteJSON(localFile(root), local);
+  fs.appendFileSync(changesFile(root), JSON.stringify({changeId, undone: true, at: new Date().toISOString()}) + '\n');
+  return {undone: change};
+}
+
+/** Auto-applied changes, newest last, with undone ones marked. */
+export function benchmarkChanges(root, {limit = 20} = {}) {
+  let rows = [];
+  try { rows = fs.readFileSync(changesFile(root), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch {}
+  const undone = new Set(rows.filter(r => r.undone).map(r => r.changeId));
+  return rows.filter(r => !r.undone).map(r => ({...r, undone: undone.has(r.changeId)})).slice(-limit);
 }
 
 /**

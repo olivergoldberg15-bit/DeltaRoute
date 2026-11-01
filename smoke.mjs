@@ -47,7 +47,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   }catch(e){row={worker:name,verdict:'FAIL',reason:e.message};}
   row.seconds=Math.round((Date.now()-started)/1000);results.push(row);console.log(row.verdict.padEnd(8),name.padEnd(11),row.seconds+'s',' '+row.reason);
  }
- const researchers=process.argv.includes('--research')?['perplexity','grok'].filter(n=>cfg.workers[n]?.enabled&&cfg.workers[n].transport==='browser'&&(!only||only.includes(n))):[];
+ const researchers=process.argv.includes('--research')?['perplexity','grok','muse'].filter(n=>cfg.workers[n]?.enabled&&cfg.workers[n].transport==='browser'&&(!only||only.includes(n))):[];
  for(const name of researchers){
   const started=Date.now();let row;
   try{const submitted=call('submit_task',{task:'In what year was the Eiffel Tower completed? Answer with the year and one source.',provider:name,fallback:false,category:'research'});row={worker:name,...researchVerdict(waitFor(submitted.id||submitted.task_id))};}

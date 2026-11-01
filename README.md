@@ -1,6 +1,6 @@
 # DeltaRoute (Δ)
 
-DeltaRoute coordinates local AI subscription clients from **Claude Code or Codex**. Your current host plans and reviews; bounded workers handle suitable tasks through their own signed-in clients. Long jobs run as an Operation Plan the user approves first: routes with token budgets, agents and cheap sub-agents, a 0-100 Review (80 passes), a simulated review of the whole product and the user's final approval, all streamed to a live local dashboard. A capability registry gives each role to the best available model. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+DeltaRoute connects the AI subscriptions you already pay for, from **Claude Code, any Claude chat (phone included) or ChatGPT**, running on your own computer. Claude does most of the work; DeltaRoute hands off only what another model is clearly better at, judged by a registry that a weekly check of live benchmarks keeps current: live research to Perplexity, Grok and Muse, images and video to Nano Banana Pro, ChatGPT, Grok Imagine, Seedance or Veo, and code when a worker leads on benchmarks. Workers share a team board, ask each other for help, render their own stills, and are watched by disposable Grok monitors. Long jobs run as an Operation Plan the user approves first: routes with token budgets, agents and cheap sub-agents, a 0-100 Review (80 passes), a simulated review of the whole product and the user's final approval, all streamed to a live local dashboard. A capability registry gives each role to the best available model. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ![DeltaRoute routing workflow](docs/deltaroute-routing.png)
 
@@ -31,38 +31,44 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install-codex.ps1 -Managed
 powershell -NoProfile -ExecutionPolicy Bypass -File .\doctor.ps1
 ```
 
-The switches opt into approval for the six local router tools. They do not grant blanket shell/browser permissions or override explicit Codex denials. Without the switches, worker submission/cancellation use normal approvals; the Codex installer may approve its read-only router tools. Installers back up changed global files and refuse to overwrite an unrelated existing MCP registration. Keep this checkout at its installed path and restart the host to load changes.
+The switches opt into approval for the seven local router tools. They do not grant blanket shell/browser permissions or override explicit Codex denials. Without the switches, worker submission/cancellation use normal approvals; the Codex installer may approve its read-only router tools. Installers back up changed global files and refuse to overwrite an unrelated existing MCP registration. Keep this checkout at its installed path and restart the host to load changes.
 
 See [setup and providers](docs/SETUP.md) for prerequisites, sign-in, research, video tools, optional skills, manual MCP setup and troubleshooting.
 
-On Linux or macOS, `node install-claude.mjs --allow-router-tools` does what `install.ps1 -AllowRouterTools` does. To run DeltaRoute on an always-on cloud server and drive it from the Claude app on a phone, see [DeltaRoute in the cloud](docs/CLOUD.md).
+On Linux or macOS, `node install-claude.mjs --allow-router-tools` does what `install.ps1 -AllowRouterTools` does. DeltaRoute runs on your own computer by default. The optional always-on cloud server setup is in [DeltaRoute in the cloud](docs/CLOUD.md); nothing uses it unless you start it.
+
+## Use it from chat
+
+- **Claude Code** runs DeltaRoute locally (installed below).
+- **Claude chat on your phone or desktop, and ChatGPT:** run `powershell -ExecutionPolicy Bypass -File .\connect.ps1 -AtLogon`. It starts DeltaRoute's endpoint on this computer, opens a Tailscale Funnel and prints a secret connector link once. Add that link in Claude (Settings > Connectors > Add custom connector) or ChatGPT (Settings > Connectors, developer mode). Then ask "make me an image of a neon octopus with Nano Banana Pro" in any chat. It works while this computer is on.
+- `node signins.mjs` shows which subscriptions are signed in (no model request); `--smoke` then runs one tiny real job per worker.
 
 ## What routes where
 
 | Work | Default role |
 |---|---|
-| Planning, creative direction, review, integration | Current Claude Code/Codex host |
-| Implementation, debugging, tests, independent feedback | Codex |
-| Quick coding, iteration, large context | Configured Google CLI / Gemini |
-| Frontend and integration | Cursor |
-| Cited web research | Perplexity through gstack, or original public sources |
-| Social source analysis | Grok through Cursor, using collected original posts |
+| Planning, creative direction, animation, review, integration, and any work Claude scores within 5 points of the best worker | Current Claude Code/Codex host |
+| Code a worker leads on (registry, from live benchmarks) | Codex, Gemini or Cursor |
+| Cited live web research | Perplexity, Grok and Muse through gstack (experimental: consumer sites), or original public sources |
+| Images and video | `generate_media`: Nano Banana Pro and other Higgsfield models (credits, capped), ChatGPT via Codex (no credits), Grok Imagine (experimental) |
+| Watching running workers | Disposable Grok monitors, Gemini Flash backup |
+| First look at rendered stills | Gemini Flash (advice only) |
 | Repetitive read-only work | Claude's native Haiku subagent, when available |
 | Animation, 3D, realism, context and verification | Relevant specialist instructions, loaded on demand |
 
 These are editable starting specialties. Availability and capabilities filter the choices. Explicit checkpoint reviews build memory by **exact model and task category**; three reviews are required before bounded ranking adjustments apply. Pin explicit model IDs for version-specific comparisons; an account-default alias can change underneath its stored feedback. This is local feedback, not an independently proven model leaderboard.
 
-Small self-contained tasks stay local because worker startup and repeated context can cost more than they save. Routing is a host policy and tool workflow, not an interceptor that guarantees every chat launches a worker.
+`recommend_route` explains each choice, and `submit_task` with provider `auto` refuses work Claude keeps (naming a provider still sends it). The weekly benchmark check applies cited score changes on its own, at most 10 points per score, only from pages the research visited, and each change can be undone. Routing is a host policy and tool workflow, not an interceptor that guarantees every chat launches a worker.
 
-Local CLI worker processes automatically receive a bounded context snapshot: applicable project/user instructions, up to three relevant installed skill entry points with excerpts, `BRIEF.md`, `STORYBOARD.md`, optional `.deltaroute/context.md`, recent jobs from the same project, known active worker PIDs, and existing output paths. Discovery checks project and user `.agents/skills`, `.claude/skills`, `.codex/skills`, and the local Codex plugin cache. Skill files do not prove a tool is available. Skills must exist on the machine running DeltaRoute; laptop-only files are not available to a cloud worker.
+Local CLI worker processes automatically receive a bounded context snapshot: applicable project/user instructions, up to two relevant installed skill entry points with excerpts (never skills the project's rules ban, like "No Higgsfield", nor deploy/publish skills), `BRIEF.md`, `STORYBOARD.md`, optional `.deltaroute/context.md`, recent jobs from the same project, known active worker PIDs, and existing output paths. Discovery checks project and user `.agents/skills`, `.claude/skills`, `.codex/skills`, and the local Codex plugin cache. Skill files do not prove a tool is available. Skills must exist on the machine running DeltaRoute; laptop-only files are not available to a cloud worker.
 
-Each attempt saves `worker-context.json` (source paths, modification times, included-content hashes, truncation flags) and `worker-context.md` (the exact prompt addition). `get_task` reports these paths and a compact `retrievedContext` summary. Prompt context is capped at 24,000 characters; large sources and partial discovery are marked. Manual `context` and workflow contracts remain in force. Chat history is not automatically inherited. For durable project-specific handoffs, save the relevant decisions and artifact paths in `.deltaroute/context.md`.
+Each attempt saves `worker-context.json` (source paths, modification times, included-content hashes, truncation flags) and `worker-context.md` (the exact prompt addition). `get_task` reports these paths and a compact `retrievedContext` summary. Prompt context is capped at 12,000 characters; large sources and partial discovery are marked. Manual `context` and workflow contracts remain in force. Chat history is not automatically inherited. For durable project-specific handoffs, save the relevant decisions and artifact paths in `.deltaroute/context.md`.
 
 Retrieval does not read credentials, raw prior prompts/answers, or other projects' jobs, follow skill-directory symlinks outside their roots, run skill scripts, or send this context to browser research/image services. Set `contextRetrieval.enabled` to `false` in local `config.json` to disable it.
 
 ## Long work and recovery
 
-Save the original prompt as a workflow with constraints, non-goals, dependencies, allowed paths and acceptance checks. Workers use pinned Git worktrees. The coordinator reviews real evidence before releasing dependent steps. Failed attempts and counters remain available. Two external workers may run at once; heavy profiles allow bounded 30-minute attempts.
+Save the original prompt as a workflow with constraints, non-goals, dependencies, allowed paths and acceptance checks. Workers use pinned Git worktrees with the project's `node_modules` linked in, and every code attempt comes back as a patch that `apply_patch` applies without a commit; the scope audit reads only that patch. Time limits follow the wall clock (a sleeping laptop no longer stretches them) and warn the worker at 80% so it saves its progress. Creative phases use light plans approved in one call and revised with a one-line approval; big builds use full Operation Plans. Four external workers may run at once; heavy profiles allow bounded 30-minute attempts.
 
 An external supervisor can replace a stopped Claude head with Codex, or vice versa, for a **managed workflow**. If both heads reach hard quotas, new work waits for verified recovery. Native app chats keep their own host.
 
@@ -89,16 +95,23 @@ npm test
 npm run test:process
 npm run test:install
 npm run usage
+npm run savings
 npm run skills:verify
 ```
 
 The default tests use local fixtures without provider calls or account resets. Process fault tests require Windows and Git; see [test and benchmark instructions](benchmarks/README.md).
 
-One historical matched log experiment reduced Claude logical input from 89,908 to 9,489 tokens. Tiny forced delegation used substantially more context than direct work. A separate managed head/worker fixture took 40.252 seconds. These are observations from individual trials, not universal speed or savings claims. Cached reads are a subset of input; browser counters may be unavailable. Fixed monthly subscription bills remain unchanged. See [verification and measurement limits](verification.md).
+One historical matched log experiment reduced Claude logical input from 89,908 to 9,489 tokens. Tiny forced delegation used substantially more context than direct work. A separate managed head/worker fixture took 40.252 seconds. These are observations from individual trials, not universal speed or savings claims. Cached reads are a subset of input; browser counters may be unavailable. Fixed monthly subscription bills remain unchanged. `npm run savings` writes `state/savings.html`: the share of fresh tokens that ran off your Claude plan, counting Claude's own tokens from Claude Code's transcripts, per project. See [verification and measurement limits](verification.md).
 
 ## Project files
 
-- `server.mjs`: six MCP tools and bounded worker adapters.
+- `server.mjs`: seven MCP tools and bounded worker adapters.
+- `media.mjs`, `image-jobs.mjs`: `generate_media` and Higgsfield/Codex/Grok image and video jobs.
+- `board.mjs`, `monitor.mjs`, `pre-review.mjs`, `render-stills.mjs`: the team board, Grok monitors, the Flash still check and stills for workers.
+- `deadline.mjs`, `patches.mjs`: wall-clock limits and commit-free integration.
+- `benchmark-news.mjs`, `registry.mjs`: the weekly benchmark check and Claude-first routing.
+- `remote-mcp.mjs`, `connect.ps1`: the endpoint for Claude and ChatGPT chats, with secret connector links.
+- `coordinator-usage.mjs`, `signins.mjs`, `templates/`: Claude's own token count, sign-in checks and job templates.
 - `workflows.mjs`: original contract, dependency gates and scope audits.
 - `coordinator-supervisor.mjs`: external managed-head lifecycle.
 - `coordinator-state.mjs`, `account-limits.mjs`: observed quota state and native readiness.

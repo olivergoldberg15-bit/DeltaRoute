@@ -1,0 +1,22 @@
+{
+  "name": "animated_explainer",
+  "summary": "A narrated animated explainer or short built in code (Remotion, HyperFrames or canvas), shot by shot.",
+  "mode": "light",
+  "visual": true,
+  "constraints": [
+    "Follow the project's BRIEF.md: script, voice timing, style and banned tools.",
+    "Every shot renders on its own frame range and matches the voiceover timing.",
+    "Workers render stills of their shots (.deltaroute/render) and fix what they see before finishing."
+  ],
+  "brief_format": "BRIEF.md: 1) one-line premise; 2) script with timestamps per shot; 3) style (palette, line, type, references); 4) characters and props with how they must read; 5) banned tools and assets; 6) output (resolution, fps, length).",
+  "step_defaults": {
+    "category": "frontend",
+    "profile": "animation",
+    "acceptance": [
+      "The shot renders without errors at its frame range.",
+      "Stills at the start, middle and end of the shot match the brief: subjects recognisable, text fully on screen, no overlap.",
+      "Motion timing matches the voiceover timestamps for the shot."
+    ]
+  },
+  "review_checklist": ["Recognisable subjects (no llama-horses)", "Text inside safe margins", "Consistent palette and line weight across shots", "Cuts land on the voiceover beats", "No banned assets"]
+}

@@ -4,8 +4,11 @@
 // client revokes it. By default a connected AI acts for the owner but never in the owner's name: it cannot approve
 // plans or reviews, change the model registry, or start code jobs unless allowed with --allow-code. --full is the
 // owner's choice to give an AI every tool and action, approvals included, exactly as the owner has them.
-// It listens on 127.0.0.1; a host's port forwarding (GitHub Codespaces) publishes it. No dependencies.
+// It listens on 127.0.0.1 on this computer; a tunnel (Tailscale Funnel, ngrok, Cloudflare) publishes it for the phone.
+// No dependencies.
 //   node remote-mcp.mjs add-client <name> [--allow-code | --full]   prints that client's key once
+//   node remote-mcp.mjs add-client <name> --link                    a secret connector link instead of a key, for the
+//                                                                   Claude and ChatGPT apps, whose connector screens take only a URL
 //   node remote-mcp.mjs set-client <name> --full | --allow-code | --limited   changes access, same key
 //   node remote-mcp.mjs list-clients | remove-client <name>
 //   node remote-mcp.mjs serve [--port 8787]                 endpoint: POST /mcp with Authorization: Bearer <key>
@@ -22,7 +25,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 export const CLIENTS_FILE=path.join(ROOT,'state','remote-clients.json');
-export const REMOTE_TOOLS=['list_workers','recommend_route','submit_task','get_task','cancel_task'];
+export const REMOTE_TOOLS=['list_workers','recommend_route','generate_media','submit_task','get_task','cancel_task'];
 export const JOBS_DIR=path.join(ROOT,'jobs');
 const MAX_BODY=1024*1024;
 const VERSION=(()=>{try{return JSON.parse(fs.readFileSync(path.join(ROOT,'package.json'),'utf8')).version;}catch{return 'unknown';}})();
@@ -47,6 +50,26 @@ export function addClient(name,{file=CLIENTS_FILE,allowCode=false,full=false}={}
  const clients=loadClients(file);if(clients[name])throw Error('A client with that name exists; remove it first to issue a new key');
  const key='dr_'+crypto.randomBytes(32).toString('base64url');
  clients[name]={keySha256:sha(key),...access({full,allowCode}),createdAt:new Date().toISOString()};saveClients(clients,file);return key;
+}
+// A secret link: /c/<secret>/mcp. The secret is the credential (only its SHA-256 is stored), so treat the link like a password.
+export function addLinkClient(name,{file=CLIENTS_FILE,allowCode=false}={}){
+ if(!/^[a-z0-9][a-z0-9_-]{0,39}$/i.test(String(name)))throw Error('Client name: 1-40 letters, digits, - or _');
+ const clients=loadClients(file);if(clients[name])throw Error('A client with that name exists; remove it first to issue a new link');
+ const secret='l'+crypto.randomBytes(32).toString('base64url');
+ clients[name]={linkSha256:sha(secret),...access({allowCode}),createdAt:new Date().toISOString()};saveClients(clients,file);return '/c/'+secret+'/mcp';
+}
+export function authorizeLink(secret,clients){
+ const digest=Buffer.from(sha(secret));
+ for(const [name,c] of Object.entries(clients))if(typeof c.linkSha256==='string'&&c.linkSha256.length===digest.length&&crypto.timingSafeEqual(Buffer.from(c.linkSha256),digest))return {name,...c};
+ return null;
+}
+// Download links for a result's files, so a phone can open what was made.
+export function withLinks(reply,base){
+ const block=reply?.result?.content?.[0];if(!base||block?.type!=='text')return reply;
+ let out;try{out=JSON.parse(block.text);}catch{return reply;}
+ if(!out||!TASK_ID.test(String(out.id))||!Array.isArray(out.files)||!out.files.length)return reply;
+ out.links=out.files.map(f=>base+'/files/'+out.id+'/'+encodeURIComponent(path.basename(f.file||f.path||'')));
+ return {...reply,result:{...reply.result,content:[{...block,text:JSON.stringify(out)},...reply.result.content.slice(1)]}};
 }
 export function setClient(name,{file=CLIENTS_FILE,full=false,allowCode=false}={}){const clients=loadClients(file);if(!clients[name])return false;clients[name]={...clients[name],...access({full,allowCode})};saveClients(clients,file);return true;}
 export function removeClient(name,{file=CLIENTS_FILE}={}){const clients=loadClients(file);if(!clients[name])return false;delete clients[name];saveClients(clients,file);return true;}
@@ -83,18 +106,22 @@ export function resolveOutput(taskId,name,jobsDir=JOBS_DIR){
  return null;
 }
 
+// The address the caller used (through the tunnel), so links in results open from the phone.
+export function publicBase(req,prefix=''){const host=req.headers['x-forwarded-host']||req.headers.host;if(!host)return null;const proto=req.headers['x-forwarded-proto']||(/^(localhost|127\.0\.0\.1)(:|$)/.test(host)?'http':'https');return proto+'://'+host+prefix;}
 export function createRemoteServer({handle,clientsFile=CLIENTS_FILE,jobsDir=JOBS_DIR,log=(...a)=>console.error(new Date().toISOString(),...a)}){
  const clients=clientStore(clientsFile),started=Date.now();
  return http.createServer(async(req,res)=>{
   const base={'Cache-Control':'no-store','X-DeltaRoute':VERSION};
   const send=(status,body,headers={})=>{if(res.headersSent)return;res.writeHead(status,{...base,...(body===undefined?{}:{'Content-Type':'application/json'}),...headers});res.end(body===undefined?undefined:JSON.stringify(body));};
   try{
-   const route=new URL(req.url,'http://x').pathname.replace(/\/+$/,'')||'/';
+   let route=new URL(req.url,'http://x').pathname.replace(/\/+$/,'')||'/';
+   const linked=/^\/c\/([A-Za-z0-9_-]{30,80})(\/.*)?$/.exec(route);let prefix='';if(linked){prefix='/c/'+linked[1];route=linked[2]||'/mcp';}
    // Answers without a key and says nothing but that it is up, so a caller can tell a down server from a forwarding fault.
    if(route==='/health'){if(!['GET','HEAD'].includes(req.method))return send(405,{error:'method_not_allowed'},{Allow:'GET, HEAD'});return req.method==='HEAD'?send(200):send(200,{ok:true,service:'DeltaRoute',version:VERSION,uptimeSeconds:Math.round((Date.now()-started)/1000)});}
    const files=/^\/files\/([^/]+)(?:\/([^/]+))?$/.exec(route);
    if(route!=='/mcp'&&!files)return send(404,{error:'not_found',hint:'POST /mcp, GET /health, GET /files/<task id>'});
-   const header=req.headers.authorization;const client=authorize(header,clients());
+   const header=req.headers.authorization;const client=linked?authorizeLink(linked[1],clients()):authorize(header,clients());
+   if(!client&&linked){log(`401 ${req.method} ${route}: link not recognised`);return send(401,{error:'unauthorized'});}
    if(!client){log(`401 ${req.method} ${route}: ${/^Bearer\s+\S+/i.test(String(header||'').trim())?'key not recognised':'no Bearer key'} (DeltaRoute's key check, not the proxy)`);return send(401,{error:'unauthorized'},{'WWW-Authenticate':'Bearer'});}
    if(files){
     if(!['GET','HEAD'].includes(req.method))return send(405,{error:'method_not_allowed'},{Allow:'GET, HEAD'});
@@ -102,7 +129,7 @@ export function createRemoteServer({handle,clientsFile=CLIENTS_FILE,jobsDir=JOBS
     if(!TASK_ID.test(taskId))return send(400,{error:'bad_task_id'});
     if(!name)return send(200,{taskId,files:listOutputs(taskId,jobsDir).map(f=>({...f,path:`/files/${taskId}/${encodeURIComponent(f.name)}`}))});
     const file=resolveOutput(taskId,name,jobsDir);if(!file)return send(404,{error:'no_such_output'});
-    const size=fs.statSync(file).size;res.writeHead(200,{...base,'Content-Type':TYPES[path.extname(file).toLowerCase()]||'application/octet-stream','Content-Length':size,'Content-Disposition':`attachment; filename="${path.basename(file).replace(/["\\\r\n]/g,'_')}"`});
+    const size=fs.statSync(file).size;res.writeHead(200,{...base,'Content-Type':TYPES[path.extname(file).toLowerCase()]||'application/octet-stream','Content-Length':size,'Content-Disposition':`${/^(image|video)\//.test(TYPES[path.extname(file).toLowerCase()]||'')?'inline':'attachment'}; filename="${path.basename(file).replace(/["\\\r\n]/g,'_')}"`});
     if(req.method==='HEAD')return res.end();
     return fs.createReadStream(file).on('error',()=>res.destroy()).pipe(res);
    }
@@ -118,7 +145,7 @@ export function createRemoteServer({handle,clientsFile=CLIENTS_FILE,jobsDir=JOBS
    const accept=String(req.headers.accept||'');const stream=/text\/event-stream/i.test(accept)&&!/application\/json|\*\/\*/i.test(accept);
    let tick;if(stream&&messages.some(m=>m?.id!==undefined)){res.writeHead(200,{...base,...session,'Content-Type':'text/event-stream','Connection':'keep-alive'});tick=setInterval(()=>res.write(': keep-alive\n\n'),15000);}
    const replies=[];try{
-    for(const msg of messages){const no=refusal(msg,client);const reply=no?(msg?.id===undefined?null:refused(msg.id,no)):await handle(msg,{allow:client.full?null:client.tools||REMOTE_TOOLS});if(reply)replies.push(reply);}
+    for(const msg of messages){const no=refusal(msg,client);const reply=no?(msg?.id===undefined?null:refused(msg.id,no)):await handle(msg,{allow:client.full?null:[...new Set([...(client.tools||REMOTE_TOOLS),'generate_media'])]});if(reply)replies.push(withLinks(reply,publicBase(req,prefix)));}
    }finally{clearInterval(tick);}
    if(tick){for(const r of replies)res.write(`event: message\ndata: ${JSON.stringify(r)}\n\n`);return res.end();}
    if(!replies.length)return send(202,undefined,session);
@@ -153,10 +180,11 @@ export async function remoteCall(baseUrl,tool,args={},opts={}){
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [cmd,arg]=process.argv.slice(2);const flag=n=>{const i=process.argv.indexOf(n);return i>0?process.argv[i+1]:undefined;};
  const opts={full:process.argv.includes('--full'),allowCode:process.argv.includes('--allow-code')};
- if(cmd==='add-client'){const key=addClient(arg,opts);console.log(`Key for ${arg} (shown once; give it to that AI as: Authorization: Bearer <key>):\n${key}`);}
+ if(cmd==='add-client'&&process.argv.includes('--link')){const link=addLinkClient(arg,opts);console.log(`Connector link path for ${arg} (shown once; it works like a password):\n${link}\nAdd it after your public address, for example https://<your-pc>.ts.net${link}, in Claude (Settings > Connectors > Add custom connector) or ChatGPT (Settings > Connectors, developer mode).`);}
+ else if(cmd==='add-client'){const key=addClient(arg,opts);console.log(`Key for ${arg} (shown once; give it to that AI as: Authorization: Bearer <key>):\n${key}`);}
  else if(cmd==='set-client')console.log(setClient(arg,opts)?`${arg} now has ${opts.full?'full access':opts.allowCode?'limited access with code jobs':'limited access'}; its key is unchanged.`:`No client named ${arg}.`);
  else if(cmd==='remove-client')console.log(removeClient(arg)?`Removed ${arg}; its key no longer works.`:`No client named ${arg}.`);
- else if(cmd==='list-clients'){for(const [n,c] of Object.entries(loadClients()))console.log(`${n}  ${c.full?'full access: every tool and action':`tools: ${c.tools.join(', ')}  code jobs: ${c.allowCode?'allowed':'off'}`}  added ${c.createdAt}`);}
+ else if(cmd==='list-clients'){for(const [n,c] of Object.entries(loadClients()))console.log(`${n}  ${c.linkSha256?'secret link':'key'}  ${c.full?'full access: every tool and action':`tools: ${c.tools.join(', ')}  code jobs: ${c.allowCode?'allowed':'off'}`}  added ${c.createdAt}`);}
  else if(['health','call','download'].includes(cmd)){
   if(!arg){console.error(`Usage: node remote-mcp.mjs ${cmd} <base url> ...`);process.exit(2);}
   const [,,,tool,extra]=process.argv.slice(1);
@@ -173,7 +201,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   const {handleMessage}=await import(pathToFileURL(path.join(ROOT,'server.mjs')).href);
   const port=Number(flag('--port')||process.env.DELTAROUTE_REMOTE_PORT||8787);
   const server=createRemoteServer({handle:handleMessage});
-  server.on('error',e=>{console.error(e.code==='EADDRINUSE'?`Port ${port} is already in use (is another copy running? tmux attach -t =deltaroute-mcp)`:e.message);process.exit(1);});
+  server.on('error',e=>{console.error(e.code==='EADDRINUSE'?`Port ${port} is already in use: DeltaRoute's endpoint is probably already running`:e.message);process.exit(1);});
   server.listen(port,'127.0.0.1',()=>console.log(`DeltaRoute MCP endpoint on http://127.0.0.1:${port}/mcp, health on /health (${Object.keys(loadClients()).length} connected AI(s))`));
   for(const sig of ['SIGTERM','SIGINT'])process.on(sig,()=>{server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),5000).unref();});
  }

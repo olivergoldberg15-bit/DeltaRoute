@@ -1,0 +1,20 @@
+{
+  "name": "research_report",
+  "summary": "A sourced research report: live-web collection by Perplexity, Grok or Muse, written up and checked by Claude.",
+  "mode": "light",
+  "visual": false,
+  "constraints": [
+    "Every claim cites an original source with its date.",
+    "Facts, inferences and unknowns are kept apart."
+  ],
+  "brief_format": "Question, who it is for, the time window, the region, and the decision the report should inform.",
+  "step_defaults": {
+    "category": "research",
+    "mode": "read-only",
+    "acceptance": [
+      "At least five original sources, each with a URL and a date inside the window.",
+      "Each key finding names its source; unsupported points are marked as unknown."
+    ]
+  },
+  "review_checklist": ["Sources are primary, not aggregators", "Dates are inside the window", "No invented posts or numbers", "Answers the question asked"]
+}

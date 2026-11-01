@@ -25,7 +25,7 @@ test('quota fallback observes a bounded provider retry hint', () => {
 test('challenge has no credential or browser-bypass action', () => {
   const failure = classifyFailure('Cloudflare browser challenge: verify you are human');
   assert.deepEqual(failure, {kind: 'challenge', retryable: true, fallbackEligible: true, blockAccount: true, cooldownMs: 1_800_000});
-  assert.deepEqual(candidateProviders({requested: 'perplexity', category: 'research', workers, blockedAccounts: ['perplexity']}), ['codex', 'gemini', 'cursor', 'grok']);
+  assert.deepEqual(candidateProviders({requested: 'perplexity', category: 'research', workers, blockedAccounts: ['perplexity']}), ['grok', 'codex', 'gemini', 'cursor']);
 });
 
 test('provider outage, timeout, capability, and incomplete source errors are recoverable', () => {
@@ -72,7 +72,7 @@ test('coding routes retain task fit and exclude browser and social models', () =
 });
 
 test('research can use read-only CLI analysis after authoritative source collection', () => {
-  assert.deepEqual(candidateProviders({category: 'research', workers}), ['perplexity', 'codex', 'gemini', 'cursor', 'grok']);
+  assert.deepEqual(candidateProviders({category: 'research', workers}), ['perplexity', 'grok', 'codex', 'gemini', 'cursor']);
   assert.deepEqual(candidateProviders({category: 'social_research', workers, attempted: ['grok', 'perplexity']}), ['codex', 'gemini', 'cursor']);
 });
 

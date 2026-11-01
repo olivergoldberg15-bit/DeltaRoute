@@ -6,6 +6,7 @@ import {acquireProcessLease} from './process-lease.mjs';
 import {atomicWriteJSON} from './state-file.mjs';
 import {PASS_SCORE} from './review.mjs';
 import {appendEvent} from './events.mjs';
+import {isRuntimePath} from './deadline.mjs';
 
 const uuid=/^[a-f0-9-]{36}$/;
 const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -18,7 +19,7 @@ export function workloadProfile(profile='standard'){const profiles={standard:{at
 export function workflowAdvice(task='',category='implementation'){const heavy=/long.{0,15}(cod|task|workflow)|heavy|large.{0,15}(cod|project|video)|multi.?(agent|step|file)|feature.{0,20}end.to.end|animat|render/i.test(task);return {recommended:heavy,profile:/animat|render/i.test(task)?'animation':category==='video_analysis'?'video_analysis':heavy?'heavy_coding':'standard',policy:'For sustained work, create a scoped workflow, run dependency-ready steps, inspect artifacts and record evidence checkpoints. Completed workers are not automatically accepted or merged.'};}
 // Operation Plan: steps are grouped into routes, each with its own budget. Legacy flat plans become one "main" route.
 const ROUTE_ID=/^[a-z][a-z0-9_-]*$/;
-const providerName=v=>{if(!['codex','gemini','cursor','perplexity','grok'].includes(v))throw Error('Invalid step provider');return v;};
+const providerName=v=>{if(!['codex','gemini','cursor','perplexity','grok','muse'].includes(v))throw Error('Invalid step provider');return v;};
 function subagentList(v=[]){if(!Array.isArray(v)||v.length>6)throw Error('A step allows at most 6 sub-agents');const list=v.map(x=>{const id=text(x?.id,'sub-agent ID',64);if(!ROUTE_ID.test(id))throw Error('Invalid sub-agent ID');return {id,task:text(x.task,'sub-agent task',4000),provider:x.provider===undefined?null:providerName(x.provider),model:x.model===undefined?null:text(x.model,'sub-agent model',120)};});if(new Set(list.map(x=>x.id)).size!==list.length)throw Error('Duplicate sub-agent ID');return list;}
 // Default token budget per allowed run. Measured Codex jobs used 30K-113K fresh input + output tokens each (Oct 2026).
 export const TOKENS_PER_RUN=150000;
@@ -44,7 +45,21 @@ export function routeUsage(plan,routeId,readJob=()=>null){let runs=0,tokens=0,un
  return {id:routeId,lead:r.lead,budget:r.budget,used:{runs,tokens,unmeasuredRuns:unmeasured},exhausted,failures:failures.slice(-6)};}
 const exhaustedError=u=>'Route '+u.id+' has used its '+u.exhausted+' budget ('+u.used.runs+' runs, '+u.used.tokens+' measured tokens) and stops here. What went wrong: '+(u.failures.map(f=>f.step+' ['+f.status+'] '+f.error).join(' | ')||'no failures recorded');
 export function approvePlan(root,id,{approvedByUser}={}){if(typeof approvedByUser!=='string'||approvedByUser.trim().length<2)throw Error('Quote the user\'s plan approval in approved_by_user');return mutateWorkflow(root,id,plan=>{if(plan.approval?.status==='approved')throw Error('Operation Plan is already approved');plan.approval={status:'approved',approvedByUser:approvedByUser.trim().slice(0,500),requestedAt:plan.approval?.requestedAt||null,at:new Date().toISOString()};appendEvent(root,id,{type:'plan_approved',by:plan.approval.approvedByUser});return workflowSummary(root,plan);});}
-export function createWorkflow(root,{task,cwd,workflow={},coordinator='codex'}){
+/** Plan edits without starting over: unchanged steps keep their jobs and reviews; changed steps and everything built on them start fresh. */
+export function revisePlan(root,id,{workflow,approvedByUser},readJob=()=>null){
+ if(typeof approvedByUser!=='string'||approvedByUser.trim().length<2)throw Error('Quote the user\'s approval of the change in approved_by_user');
+ return mutateWorkflow(root,id,plan=>{
+  for(const p of Object.values(plan.progress))for(const jobId of allJobs(p)){let status=null;try{status=readJob(jobId)?.status;}catch{}if(['queued','running'].includes(status))throw Error('Wait for running workers to stop before revising the plan');}
+  const next=buildContract({task:plan.contract.originalPrompt,cwd:plan.contract.cwd,workflow:{mode:plan.contract.mode,...workflow}}),old=plan.contract;
+  const changed=new Set(next.steps.filter(s=>JSON.stringify(old.steps.find(o=>o.id===s.id)||null)!==JSON.stringify(s)).map(s=>s.id));
+  for(let grew=true;grew;){grew=false;for(const s of next.steps)if(!changed.has(s.id)&&s.dependsOn.some(d=>changed.has(d))){changed.add(s.id);grew=true;}}
+  const progress=Object.fromEntries(next.steps.map(s=>[s.id,!changed.has(s.id)&&plan.progress[s.id]?plan.progress[s.id]:{jobs:[],checkpoint:null,subagents:Object.fromEntries(s.subagents.map(x=>[x.id,{jobs:[]}]))}]));
+  const dropped=Object.fromEntries(Object.entries(plan.progress).filter(([sid])=>!progress[sid]||progress[sid]!==plan.progress[sid]).map(([sid,p])=>[sid,allJobs(p)]));
+  plan.revisions=[...(plan.revisions||[]),{at:new Date().toISOString(),fromHash:plan.contractHash,approvedByUser:approvedByUser.trim().slice(0,500),restarted:[...changed],droppedJobs:dropped}];
+  plan.contract=next;plan.contractHash=hash(next);plan.progress=progress;plan.approval={...(plan.approval||{}),status:'approved',at:new Date().toISOString()};delete plan.final;
+  appendEvent(root,id,{type:'plan_revised',restarted:[...changed]});return {...workflowSummary(root,plan,readJob),restarted:[...changed]};});
+}
+function buildContract({task,cwd,workflow={}}){
  const originalPrompt=text(task,'task',100000),objective=text(workflow.objective||task,'objective');
  if(!Array.isArray(workflow.steps)||!workflow.steps.length||workflow.steps.length>64)throw Error('Workflow requires 1 to 64 steps');
  const steps=workflow.steps.map(s=>{const id=text(s.id,'step ID',64);if(!/^[a-z][a-z0-9_-]*$/.test(id))throw Error('Invalid step ID');const category=s.category||'implementation';if(!['video_analysis','implementation','quick_coding','iteration','debugging','tests','review','research','social_research','large_context','planning','creative','frontend','simple','summarization'].includes(category))throw Error('Invalid workflow category');const mode=s.mode||'read-only';if(!['code','read-only'].includes(mode))throw Error('Invalid mode');const allowedPaths=strings(s.allowed_paths||[],'allowed paths',32).map(allowedPath);if(mode==='code'&&!allowedPaths.length)throw Error('Code workflow steps require allowed_paths');const profile=s.profile||'standard';workloadProfile(profile);const acceptance=strings(s.acceptance,'acceptance checks',12);if(!acceptance.length)throw Error('Every step requires acceptance checks');return {id,task:text(s.task,'step task'),mode,category,profile,allowedPaths,acceptance,dependsOn:strings(s.depends_on||[],'dependencies',64),inputs:strings(s.inputs||[],'input references',16),media:s.media_options||null,route:s.route===undefined?'main':text(s.route,'route ID',64),provider:s.provider===undefined?null:providerName(s.provider),model:s.model===undefined?null:text(s.model,'step model',120),subagents:subagentList(s.subagents)};});
@@ -53,9 +68,18 @@ export function createWorkflow(root,{task,cwd,workflow={},coordinator='codex'}){
  const maxJobs=workflow.max_jobs??Math.min(128,steps.reduce((n,s)=>n+1+s.subagents.length,0)*3);if(!Number.isInteger(maxJobs)||maxJobs<1||maxJobs>256)throw Error('Invalid workflow job budget');
  const perStep=workflow.max_runs_per_step??3;if(!Number.isInteger(perStep)||perStep<1||perStep>8)throw Error('Invalid workflow step retry budget');
  const routes=routeList(workflow.routes,steps,perStep);
- const contract={originalPrompt,objective,cwd:path.resolve(cwd),constraints:strings(workflow.constraints||[],'constraints'),nonGoals:strings(workflow.non_goals||[],'non-goals'),visual:workflow.visual===true,routes,steps,maxJobs,maxRunsPerStep:perStep};
+ if(workflow.mode!==undefined&&!['full','light'].includes(workflow.mode))throw Error('workflow.mode must be full or light');
+ return {originalPrompt,objective,cwd:path.resolve(cwd),constraints:strings(workflow.constraints||[],'constraints'),nonGoals:strings(workflow.non_goals||[],'non-goals'),visual:workflow.visual===true,routes,steps,maxJobs,maxRunsPerStep:perStep,...(workflow.mode==='light'?{mode:'light'}:{})};
+}
+// Light mode is for creative phases where direction still moves: the user's go-ahead in chat approves the plan
+// in the same call, and revise_plan takes a one-line approval. Full Operation Plans stay for big builds.
+export function createWorkflow(root,{task,cwd,workflow={},coordinator='codex',approvedByUser=null}){
+ const contract=buildContract({task,cwd,workflow}),{routes,steps,originalPrompt}=contract;
+ if(approvedByUser!==null&&contract.mode!=='light')throw Error('Only light-mode plans are approved at creation; show a full Operation Plan to the user first, then call approve_plan');
+ if(approvedByUser!==null&&(typeof approvedByUser!=='string'||approvedByUser.trim().length<2))throw Error('Quote the user\'s go-ahead in approved_by_user');
  const id=crypto.randomUUID(),file=fileFor(root,id);fs.mkdirSync(path.dirname(file),{recursive:true});
- const plan={id,kind:'workflow',coordinator,createdAt:new Date().toISOString(),approval:{status:'awaiting_user',requestedAt:new Date().toISOString()},contract,contractHash:hash(contract),originalPromptHash:hash(originalPrompt),progress:Object.fromEntries(steps.map(s=>[s.id,{jobs:[],checkpoint:null,subagents:Object.fromEntries(s.subagents.map(x=>[x.id,{jobs:[]}]))}]))};atomicWriteJSON(file,plan);appendEvent(root,id,{type:'plan_created',routes:routes.map(r=>r.id),steps:steps.length});return workflowSummary(root,plan);
+ const now=new Date().toISOString(),approval=approvedByUser?{status:'approved',approvedByUser:approvedByUser.trim().slice(0,500),requestedAt:now,at:now,light:true}:{status:'awaiting_user',requestedAt:now};
+ const plan={id,kind:'workflow',coordinator,createdAt:now,approval,contract,contractHash:hash(contract),originalPromptHash:hash(originalPrompt),progress:Object.fromEntries(steps.map(s=>[s.id,{jobs:[],checkpoint:null,subagents:Object.fromEntries(s.subagents.map(x=>[x.id,{jobs:[]}]))}]))};atomicWriteJSON(file,plan);appendEvent(root,id,{type:'plan_created',routes:routes.map(r=>r.id),steps:steps.length});return workflowSummary(root,plan);
 }
 export function readWorkflow(root,id){const plan=JSON.parse(fs.readFileSync(fileFor(root,id),'utf8'));if(hash(plan.contract)!==plan.contractHash||hash(plan.contract.originalPrompt)!==plan.originalPromptHash)throw Error('Workflow contract changed outside coordinator workflow; preserve it and create a revised workflow');return plan;}
 export function mutateWorkflow(root,id,fn){const release=acquireProcessLease(fileFor(root,id)+'.lock');try{const plan=readWorkflow(root,id),result=fn(plan);atomicWriteJSON(fileFor(root,id),plan);return result;}finally{release();}}
@@ -88,10 +112,19 @@ export function checkpointStep(root,id,stepId,checkpoint,readJob){return mutateW
  if(checkpoint.accepted===false||score!==undefined&&score<PASS_SCORE){if(checkpoint.accepted===true)throw Error('A score below '+PASS_SCORE+' cannot be accepted; it goes back to the branch that made it');progress.lastRejection={taskId:job.id,note,...(score!==undefined?{score}:{}),reviewer,at:new Date().toISOString()};appendEvent(root,id,{type:'sent_back',step:stepId,taskId:job.id,score:score??null,note:note.slice(0,200)});return workflowSummary(root,plan,readJob);}
  if(plan.approval&&score===undefined)throw Error('Review must score the result 0-100 against the approved plan; '+PASS_SCORE+' or above passes');
  if(job.selfCheck?.passed===false&&!(typeof checkpoint.self_check_addressed==='string'&&checkpoint.self_check_addressed.trim()))throw Error('The log self-check flagged blocking findings; say how each was resolved in self_check_addressed before accepting: '+job.selfCheck.findings.filter(f=>f.severity==='blocking').map(f=>f.kind).join(', '));
- const coordinatorCompleted=checkpoint.coordinator_completed===true&&job.status==='needs_coordinator'&&job.handoff?.action!=='wait_for_worker_shutdown';if(checkpoint.accepted!==true||job.status!=='completed'&&!coordinatorCompleted)throw Error('Only completed workers or an explicit coordinator completion after handoff can receive accepted checkpoints');const scopeAudit=coordinatorCompleted&&step.mode==='code'?auditWorktree(plan.contract.cwd,job.baseRef,step.allowedPaths):job.scopeAudit;if(step.mode==='code'&&scopeAudit?.passed!==true)throw Error('Code checkpoint requires a passing file-scope audit');
+ const coordinatorCompleted=checkpoint.coordinator_completed===true&&job.status==='needs_coordinator'&&job.handoff?.action!=='wait_for_worker_shutdown';if(checkpoint.accepted!==true||job.status!=='completed'&&!coordinatorCompleted)throw Error('Only completed workers or an explicit coordinator completion after handoff can receive accepted checkpoints');const scopeAudit=coordinatorCompleted&&step.mode==='code'?coordinatorScope(plan,step,job,checkpoint):job.scopeAudit;if(step.mode==='code'&&scopeAudit?.passed!==true)throw Error('Code checkpoint requires a passing file-scope audit');
  const checks=Array.isArray(checkpoint.checks)?checkpoint.checks.map(x=>({criterion:text(x.criterion,'criterion',2000),passed:x.passed===true,evidence:text(x.evidence,'evidence',3000)})):null;if(!Array.isArray(checks)||!step.acceptance.every(c=>checks.some(x=>x.criterion===c&&x.passed===true&&typeof x.evidence==='string'&&x.evidence.trim())))throw Error('Checkpoint requires passing evidence for every acceptance criterion');
  let integratedHead=null;if(step.mode==='code'){integratedHead=git(plan.contract.cwd,['rev-parse','HEAD']);if(dirtyEntries(plan.contract.cwd).length)throw Error('Checkpoint requires a clean integrated checkout');if(checkpoint.integrated_head!==integratedHead)throw Error('Checkpoint integrated_head does not match current checkout');if(scopeAudit.changedPaths.length&&integratedHead===job.baseRef)throw Error('Integrate accepted code before releasing dependent steps');}
  progress.checkpoint={taskId:job.id,completedBy:coordinatorCompleted?'coordinator':'worker',note,checks,integratedHead,at:new Date().toISOString(),reviewer,...(score!==undefined?{score}:{}),...(job.selfCheck?.passed===false?{selfCheckAddressed:text(checkpoint.self_check_addressed,'self-check resolution',2000)}:{})};appendEvent(root,id,{type:'accepted',step:stepId,taskId:job.id,score:score??null});return workflowSummary(root,plan,readJob);});}
+
+// A coordinator finish is audited on this step's own change. Comparing the whole project with the step's start
+// counted the coordinator's and other steps' changes against it (report of 2026-11-01). Preferred: the commits that
+// integrated this step (integrated_from..HEAD); else the step's own worktree; else the old whole-project check.
+export function coordinatorScope(plan,step,job,checkpoint={}){
+ if(checkpoint.integrated_from!==undefined){const from=text(checkpoint.integrated_from,'integrated_from',80);git(plan.contract.cwd,['merge-base','--is-ancestor',from,'HEAD']);const paths=git(plan.contract.cwd,['diff','--no-renames','--name-only','-z',from,'HEAD','--']).split('\0').filter(p=>p&&!isRuntimePath(p));return {...auditChangedPaths(paths,step.allowedPaths),source:'integrated_from..HEAD'};}
+ const worktree=[job.worktree,...(job.attempts||[]).map(a=>a.worktree).reverse()].find(w=>w&&fs.existsSync(w));
+ if(worktree)return {...auditWorktree(worktree,job.baseRef,step.allowedPaths),source:'step worktree'};
+ return {...auditWorktree(plan.contract.cwd,job.baseRef,step.allowedPaths),source:'whole project since the step started'};}
 
 // Visual work cannot pass on a worker's word: workers never see their own renders (Les Mis, Oct 2026).
 export function isVisual(plan){return plan.contract.visual===true||plan.contract.steps.some(s=>s.profile==='animation'||['frontend','video_analysis'].includes(s.category));}
@@ -119,7 +152,7 @@ export function finalReview(root,id,{chiefNote,approvedByUser}={},readJob){retur
  return workflowSummary(root,plan,readJob);});}
 export function workflowPhase(plan){if(approvalBlock(plan))return 'awaiting_plan_approval';if(plan.final?.approvedByUser)return 'done';const sim=plan.simulatedReviews?.at(-1);if(plan.contract.steps.some(s=>!plan.progress[s.id].checkpoint))return sim&&!sim.passed?'reworking_after_simulated_review':'running';if(!sim?.passed)return 'awaiting_simulated_review';return plan.final?.chiefNote?'awaiting_user_approval':'awaiting_chief_review';}
 export function auditChangedPaths(changedPaths,allowedPaths,{platform=process.platform}={}){const normalize=value=>platform==='win32'?value.toLowerCase():value;const allowed=allowedPaths.map(allowedPath).map(normalize);const outside=changedPaths.filter(p=>!allowed.some(a=>normalize(p)===a||normalize(p).startsWith(a+'/')));return {passed:outside.length===0,changedPaths,outside,scope:'Post-run tracked and untracked Git path audit; not an OS access boundary or semantic correctness proof'};}
-export function changedPaths(cwd,baseRef){const tracked=git(cwd,['diff','--no-renames','--name-only','-z',baseRef,'--']).split('\0').filter(Boolean),untracked=git(cwd,['ls-files','--others','--exclude-standard','-z']).split('\0').filter(Boolean);return [...new Set([...tracked,...untracked])];}
+export function changedPaths(cwd,baseRef){const tracked=git(cwd,['diff','--no-renames','--name-only','-z',baseRef,'--']).split('\0').filter(Boolean),untracked=git(cwd,['ls-files','--others','--exclude-standard','-z']).split('\0').filter(Boolean);return [...new Set([...tracked,...untracked])].filter(p=>!isRuntimePath(p));}
 // gstack /browse keeps runtime files (port, token, pid) in <git root>/.gstack/. They are never project work, so untracked ones do not make a checkout dirty.
-export function dirtyEntries(cwd){return git(cwd,['status','--porcelain','-z']).split('\0').filter(e=>e&&!/^\?\? \.gstack\//.test(e));}
+export function dirtyEntries(cwd){return git(cwd,['status','--porcelain','-z']).split('\0').filter(e=>e&&!/^\?\? \.gstack\//.test(e)&&!(e.startsWith('?? ')&&isRuntimePath(e.slice(3))));}
 export function auditWorktree(cwd,baseRef,allowedPaths){return auditChangedPaths(changedPaths(cwd,baseRef),allowedPaths);}

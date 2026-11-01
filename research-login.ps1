@@ -1,4 +1,4 @@
-param([ValidateSet('perplexity','grok')][string]$Provider='perplexity',[switch]$Finish)
+param([ValidateSet('perplexity','grok','muse')][string]$Provider='perplexity',[switch]$Finish)
 $ErrorActionPreference='Stop'
 $configPath=Join-Path $PSScriptRoot 'config.json'
 if(-not (Test-Path -LiteralPath $configPath)){throw 'Run node setup.mjs first.'}
@@ -24,7 +24,7 @@ if($Finish){
   Write-Output 'Logins saved for DeltaRoute research. The sign-in window can be closed.'
   return
 }
-$url=if($Provider -eq 'perplexity'){'https://www.perplexity.ai'}else{'https://grok.com'}
+$url=@{perplexity='https://www.perplexity.ai';grok='https://grok.com';muse='https://www.meta.ai'}[$Provider]
 & $B goto $url
 if($LASTEXITCODE -ne 0){throw 'gstack could not open the provider page.'}
 & $B handoff 'Sign into your existing research account using its normal browser flow. Complete challenges yourself, leave this window open, then run research-login.ps1 -Finish.'

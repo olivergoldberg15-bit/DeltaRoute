@@ -19,6 +19,7 @@ export function compactJob(job,root,maxAnswer=6000){
  if(job.mediaEvidence){const {reportExcerpt,...media}=job.mediaEvidence;result.mediaEvidence=media;}
  if(job.workflowRef)result.workflowRef=job.workflowRef;if(job.scopeAudit){const audit=job.scopeAudit;result.scopeAudit={...audit,changedPaths:audit.changedPaths?.slice(0,40),outside:audit.outside?.slice(0,20),changedPathCount:audit.changedPaths?.length||0,outsidePathCount:audit.outside?.length||0,pathsTruncated:(audit.changedPaths?.length||0)>40||(audit.outside?.length||0)>20};}if(job.limits)result.limits=job.limits;
  if(job.handoff)result.handoff=job.handoff;
+ if(job.patch)result.patch={file:job.patch.file,paths:job.patch.paths?.slice(0,30),pathCount:job.patch.paths?.length||0,bytes:job.patch.bytes};if(job.renders)result.renders=job.renders.slice(-4);if(job.preReview)result.preReview=job.preReview;if(job.monitors)result.monitors=job.monitors.slice(-3);if(job.attention)result.attention=job.attention;if(job.helpers)result.helpers=job.helpers;
  if(job.files)result.files=job.files;if(job.credits)result.credits=job.credits;if(job.warning)result.warning=job.warning;if(job.recoveredFrom)result.recoveredFrom=job.recoveredFrom;if(job.outDir)result.outDir=job.outDir;
  if(job.attempts)result.attempts=job.attempts.map(a=>({taskId:a.taskId,provider:a.provider,status:a.status,error:a.error,failureKind:a.failure?.kind,worktree:a.worktree}));
  result.artifacts={status:root.replaceAll('\\','/')+'/jobs/'+job.id+'/status.json'};

@@ -60,9 +60,10 @@ export function classifyFailure(error, cooldowns = {}) {
 
 const CODING = new Set(['implementation', 'quick_coding', 'iteration', 'debugging', 'tests', 'review', 'large_context', 'frontend']);
 const CLI = new Set(['codex', 'gemini', 'cursor']);
-const PROVIDERS = new Set(['codex', 'gemini', 'cursor', 'perplexity', 'grok', 'higgsfield']);
+const PROVIDERS = new Set(['codex', 'gemini', 'cursor', 'perplexity', 'grok', 'muse', 'higgsfield']);
 // Image jobs: Nano Banana Pro on the user's Higgsfield credits first, Codex's built-in image tool as the no-credit backup.
-const IMAGE = new Set(['higgsfield', 'codex']);
+// Grok Imagine (grok.com) only when asked for by name: it is never in the automatic image order.
+const IMAGE = new Set(['higgsfield', 'codex', 'grok']);
 const ORDERS = Object.freeze({
   image: ['higgsfield', 'codex'],
   video_analysis: ['codex'],
@@ -75,8 +76,8 @@ const ORDERS = Object.freeze({
   large_context: ['gemini', 'codex', 'cursor'],
   frontend: ['cursor', 'codex', 'gemini'],
   summarization: ['gemini', 'codex', 'cursor'],
-  research: ['perplexity', 'codex', 'gemini', 'cursor', 'grok'],
-  social_research: ['grok', 'perplexity', 'codex', 'gemini', 'cursor'],
+  research: ['perplexity', 'grok', 'muse', 'codex', 'gemini', 'cursor'],
+  social_research: ['grok', 'perplexity', 'muse', 'codex', 'gemini', 'cursor'],
 });
 
 /** Research CLI candidates require a separately collected, validated source packet. */

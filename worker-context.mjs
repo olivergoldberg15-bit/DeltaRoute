@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 
-const MAX_PROMPT = 24000;
+const MAX_PROMPT = 12000;
 const ignored = new Set(['.git', 'node_modules', 'vendor', 'test', 'tests', 'fixtures', 'jobs', 'workflows', 'state', 'references', 'sections', 'assets', 'scripts', 'docs', 'bin', 'dist', 'images', 'examples']);
 const stopWords = new Set('the this that with from into your their have which when only using make create work task project files skills context process processes please should would could about like need read'.split(' '));
 const tokens = value => [...new Set(String(value).toLowerCase().match(/[a-z][a-z0-9]{2,}/g) || [])].filter(t => !stopWords.has(t));
@@ -79,16 +79,37 @@ export function discoverSkills(roots, {maxEntries = 3000, maxSkills = 400} = {})
   return {skills: result, limited: visited >= maxEntries || result.length >= maxSkills};
 }
 
-export function selectInstalledSkills(task, skills, limit = 3) {
+// Workers never deploy, publish or ship, so skills for that are noise unless the task names them.
+const OFF_LIMITS = /deploy|publish|ship|release|canary|land-and/;
+const glob = pattern => new RegExp('^' + String(pattern).toLowerCase().replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+
+/** Tool or brand words the user's own rules forbid ("No Higgsfield", "never use X"), found in instruction text. */
+export function bannedWords(text) {
+  const words = new Set();
+  for (const line of String(text).split(/\r?\n/)) {
+    if (!/\b(no|never|don'?t|do not|avoid|banned?|without|not allowed)\b/i.test(line)) continue;
+    for (const w of tokens(line)) if (w.length >= 5) words.add(w);
+  }
+  return words;
+}
+
+export function selectInstalledSkills(task, skills, limit = 2, {blocked = [], bannedText = ''} = {}) {
   const query = String(task).toLowerCase(), words = tokens(query);
-  return skills.map((skill, order) => {
+  const blockedPatterns = blocked.map(glob), banned = bannedWords(bannedText);
+  return skills.filter(skill => {
+    const name = skill.name.toLowerCase(), first = name.split(/[^a-z0-9]+/)[0];
+    if (blockedPatterns.some(p => p.test(name))) return false;
+    // A rule like "No Higgsfield" drops every higgsfield-* skill, unless the task itself asks for it.
+    if (first.length >= 5 && banned.has(first) && !query.includes(first)) return false;
+    return !OFF_LIMITS.test(name) || query.includes(name);
+  }).map((skill, order) => {
     const name = skill.name.toLowerCase(), names = tokens(name), description = new Set(tokens(skill.description));
     const explicit = query.includes('$' + name) || query.includes('/' + name);
     const named = query.includes(name) || names.length && names.every(w => words.includes(w));
     const owner = name === 'hyperframes' && /\b(video|animation|animate|motion graphic)\b/.test(query) || name === 'browse' && /\b(brows(e|ing)|website|web page)\b/.test(query);
     const score = (explicit ? 100 : named ? 20 : 0) + (owner ? 80 : 0) + names.filter(w => words.includes(w)).length * 5 + Math.min(12, words.filter(w => description.has(w)).length);
     return {...skill, score, order};
-  }).filter(s => s.score >= 2).sort((a, b) => b.score - a.score || a.order - b.order).filter((s, i, all) => all.findIndex(other => other.name.toLowerCase() === s.name.toLowerCase()) === i).slice(0, limit);
+  }).filter(s => s.score >= 7).sort((a, b) => b.score - a.score || a.order - b.order).filter((s, i, all) => all.findIndex(other => other.name.toLowerCase() === s.name.toLowerCase()) === i).slice(0, limit);
 }
 
 function relatedJobs(routerRoot, cwd, currentId) {
@@ -123,10 +144,10 @@ function relatedJobs(routerRoot, cwd, currentId) {
   return found;
 }
 
-export function buildWorkerContext({cwd, projectCwd = cwd, task, routerRoot, jobId, home = os.homedir(), skillRoots = defaultSkillRoots(cwd, home), now = new Date().toISOString()}) {
+export function buildWorkerContext({cwd, projectCwd = cwd, task, routerRoot, jobId, home = os.homedir(), skillRoots = defaultSkillRoots(cwd, home), blockedSkills = [], now = new Date().toISOString()}) {
   const directories = projectDirectories(cwd), projectRoot = directories[0];
   const instructions = [], projectFiles = [];
-  let instructionBudget = 8000;
+  let instructionBudget = 5000;
   for (const [file, root, limit] of [[path.join(home, '.codex', 'AGENTS.md'), path.join(home, '.codex'), 1000], [path.join(home, '.claude', 'CLAUDE.md'), path.join(home, '.claude'), 1000], ...directories.flatMap(dir => ['AGENTS.md', 'CLAUDE.md', 'GEMINI.md'].map(name => [path.join(dir, name), projectRoot, 4000]))]) {
     const item = source(file, root, Math.min(limit, instructionBudget));
     if (item && !instructions.some(i => i.path === item.path)) { instructions.push(item); instructionBudget = Math.max(0, instructionBudget - Buffer.byteLength(item.content)); }
@@ -136,8 +157,8 @@ export function buildWorkerContext({cwd, projectCwd = cwd, task, routerRoot, job
     if (item) projectFiles.push(item);
   }
   const catalog = discoverSkills(skillRoots);
-  const skills = selectInstalledSkills(task, catalog.skills).flatMap(skill => {
-    const item = source(skill.path, skill.root, 2500);
+  const skills = selectInstalledSkills(task, catalog.skills, 2, {blocked: blockedSkills, bannedText: instructions.map(i => i.content).join('\n')}).flatMap(skill => {
+    const item = source(skill.path, skill.root, 1500);
     return item ? [{name: skill.name, description: skill.description.slice(0, 300), ...item}] : [];
   });
   const artifacts = [];

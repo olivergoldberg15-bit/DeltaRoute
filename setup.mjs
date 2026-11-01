@@ -89,6 +89,8 @@ export function buildConfig(found,{root=ROOT,template=JSON.parse(fs.readFileSync
    workers.higgsfield.reason=workers.higgsfield.command?'Higgsfield CLI detected. Image jobs spend account credits (priced and capped first); set enabled to true to use Nano Banana Pro.':'Install the Higgsfield CLI and run higgsfield auth login to use Nano Banana Pro for image jobs.';}
   workers.perplexity.enabled=!!found.browser;
   workers.perplexity.reason=found.browser?'gstack detected; sign into your existing account with research-login.ps1 before use.':'Install gstack separately for browser research; no paid research API fallback is configured.';
+  // Muse (Meta AI on meta.ai) is driven through the same research browser; experimental.
+  if(workers.muse){workers.muse.enabled=!!found.browser;workers.muse.reason=found.browser?'gstack detected; sign into meta.ai with research-login.ps1 muse before use. Experimental: browser automation of a consumer site.':'Install gstack separately to use Muse through meta.ai.';}
   config.coordinators={claude:{command:found.claude||''},codex:{command:found.codex||''}};
   config.watch={python:found.python||'',ytDlp:found.ytDlp||'',script:found.watchScript||'',noPaidAPIs:true};
   return config;

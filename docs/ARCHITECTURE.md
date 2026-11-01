@@ -28,20 +28,47 @@ flowchart TD
   OP & R2 & R3 & RV & SIM & CF -.every step.-> D[(events.jsonl + live dashboard.html)]
 ```
 
-## The six MCP tools
+## How 2.0 works (the drawing)
+
+```mermaid
+flowchart LR
+  U[User: Claude Code, Claude chat on phone/desktop, or ChatGPT] --> O[Orchestrator: the chat's own model, with its skills, repos and connectors]
+  O --> IT{Independent routing: registry kept current by a weekly live-benchmark check}
+  IT -->|Claude is as good or better| O
+  IT -->|a worker clearly leads, or Claude cannot do it| W
+  subgraph W[Interconnected agents]
+    CX[Codex] <--> B[(Team board)]
+    GM[Gemini] <--> B
+    RS[Perplexity / Grok / Muse] <--> B
+    MD[Nano Banana Pro / ChatGPT / Grok Imagine / Seedance / Veo] <--> B
+  end
+  B -->|help request| H[Helper launched at once, read-only]
+  H --> B
+  M[Disposable Grok monitors] -.watch and nudge.-> W
+  W --> P[Patch + rendered stills + Flash first look]
+  P --> O
+```
+
+The routing decision is made from the registry, not by whichever model the user is chatting with: Claude keeps work
+unless a worker leads by `delegation.margin`. Agents reach each other only through the board, which DeltaRoute serves
+(launching helpers within seconds, capped per job), so there are no unbounded loops. Monitors advise; they never stop a
+worker.
+
+## The seven MCP tools
 
 | Tool | Purpose |
 |---|---|
-| `list_workers` | Compact installation, cooldown, model and optional usage state |
-| `recommend_route` | Capability-aware specialties, reviewed fit and relevant skill paths |
-| `submit_task` | Delegate or create/run/checkpoint a persistent workflow |
-| `get_task` | Read compact results or saved workflow status; optional bounded wait |
+| `list_workers` | Compact installation, cooldown, model and optional usage state, plus the honest savings line and new benchmark changes |
+| `recommend_route` | Claude-first verdict, capability-aware specialties, templates and relevant skill paths |
+| `generate_media` | Images and video by plain model name on Higgsfield, Codex or Grok Imagine, with previews and links |
+| `submit_task` | Delegate, run a workflow (full or light), apply a patch, render stills, post to the board |
+| `get_task` | Compact results (files, patch, previews, monitor and Flash notes) or a workflow summary with its board and Claude's tokens |
 | `cancel_task` | Stop a job and its children while retaining evidence |
-| `model_registry` | Role assignment from capability scores; refresh live model lists into proposals that only the user's quoted approval applies |
+| `model_registry` | Role assignment from capability scores; the weekly benchmark check (`news`), `undo`, and manual proposals |
 
-Transport is line-delimited JSON-RPC over stdio. `node server.mjs --call
-list_workers '{}'` is a local diagnostic interface. The server has no public
-HTTP listener, mock API key or subscription-cookie proxy.
+Transport is line-delimited JSON-RPC over stdio for Claude Code. `remote-mcp.mjs` serves the same tools over MCP
+Streamable HTTP on 127.0.0.1 for chats, behind a tunnel (`connect.ps1`), with per-client keys or secret links.
+`node server.mjs --call list_workers '{}'` is a local diagnostic interface.
 
 ## Contracts and coding isolation
 
@@ -81,8 +108,8 @@ Chief's note and then the user's approval; only then is the workflow done.
 
 Every change is appended to `workflows/<id>/events.jsonl` and redrawn into
 `workflows/<id>/dashboard.html`, a static page that refreshes itself every few seconds until the
-run is done. There is no server and nothing opens a window. Token counts there cover workers only;
-the host's own tokens as Chief and reviewer are not measured.
+run is done. There is no server and nothing opens a window. Token counts there cover workers;
+`get_task` on the workflow adds Claude's own tokens (`chiefTokens`), read from Claude Code's transcripts.
 
 ## Honest failures and the smoke test
 

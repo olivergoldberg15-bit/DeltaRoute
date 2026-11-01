@@ -9,7 +9,7 @@ let input='';for await(const chunk of process.stdin)input+=chunk;
 try{
  const request=JSON.parse(input||'{}');
  if(process.env.MODEL_ROUTER_WORKER!=='1'){
-  const policy='DeltaRoute (Δ): Claude is Chief (plan, review, integrate). Delegate big, testable chunks to enabled workers (Codex coding, Gemini iteration and large context, Perplexity research via gstack, Grok and Cursor when installed); keep small or visual work here. Multi-step work: Operation Plan approved by the user first, scored Review (80 passes), simulated review, then user approval. No paid API fallback or permission bypass. Browsing: gstack.';
+  const policy='DeltaRoute (Δ): Claude does most of the work; hand off only what a worker beats Claude at (recommend_route): live research to Perplexity, Grok or Muse, images and video with generate_media. Running workers have a team board, Grok monitors and a Flash still check: review once at the end, no polling. Light plans for creative phases, full Operation Plans for big builds. No paid API fallback. Browsing: gstack.';
   const cfg=JSON.parse(fs.readFileSync(path.join(root,'config.json'),'utf8'));
   const status=Object.entries(cfg.workers).filter(([,w])=>w.enabled).map(([n])=>n).join(', ');
   const hints=selectOptimizationSkills(request.prompt||'');if(/heavy|long.{0,15}(cod|task)|multi.?(step|agent)|animat|large.{0,15}video/i.test(request.prompt||''))hints.push({name:'heavy-workflows',action:'Read '+path.join(root,'deltaroute-skill/references/heavy-workflows.md')+'; save original scope and dependency/evidence checkpoints.'});for(const s of selectSpecialists(request.prompt||'',{limit:2}))hints.push({name:s.id,action:'Read only if needed: '+s.path});

@@ -1,0 +1,21 @@
+{
+  "name": "feature_tests",
+  "summary": "A feature with its tests: implement, cover with tests, keep the existing suite green.",
+  "mode": "full",
+  "visual": false,
+  "constraints": [
+    "Change only the files the step allows; keep the diff small and in the project's style.",
+    "The existing test suite still passes."
+  ],
+  "brief_format": "Task: what the feature does, for whom, and the exact inputs and outputs. Files: where it lives. Done when: the tests that prove it.",
+  "step_defaults": {
+    "category": "implementation",
+    "profile": "standard",
+    "acceptance": [
+      "New tests cover the feature's main path and one failure case, and they pass.",
+      "The project's full test command passes.",
+      "No changes outside the allowed paths."
+    ]
+  },
+  "review_checklist": ["Tests fail without the change and pass with it", "No unrelated refactors", "Error messages say what went wrong", "Matches surrounding code style"]
+}

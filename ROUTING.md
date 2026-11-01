@@ -1,12 +1,12 @@
 <!-- subscription-worker-router:start -->
 ## DeltaRoute (Δ)
 
-DeltaRoute hands bounded work to the user's other subscriptions (Codex, Gemini, Perplexity) so it does not spend the Claude limit. Claude is Chief: it plans, reviews and integrates. Delegate big chunks that can be checked with a test; keep small tasks and visual back-and-forth here.
+Claude does most of the work. DeltaRoute hands off only what another model is clearly better at, judged by a registry that a weekly benchmark check keeps current: live research to Perplexity, Grok and Muse; images and video to Nano Banana Pro, ChatGPT, Grok Imagine, Seedance or Veo with `generate_media`; code only when a worker leads Claude on benchmarks. `recommend_route` says who; auto delegation of work Claude keeps is refused.
 
-- Roles go to the best available model: `model_registry` with action `roles`.
-- Multi-step work runs as an Operation Plan: `create_workflow`, show the user the plan, `approve_plan` with their words, then `run_subagent` and `run_step`. Review scores each step 0-100 (80 passes; lower goes back with notes), then `simulated_review`, then `final_review` and the user's approval. Share the dashboard path.
-- On `needs_coordinator`, finish the step here from the saved artifacts.
-- No paid API fallback, permission bypass, publishing or recursive delegation. All browsing uses gstack.
+- Workers share a team board and can ask any AI for help. Grok monitors check running workers and a cheap Gemini Flash pass screens rendered stills, so don't poll or re-check running work: review once at the end from the monitor notes, the stills and the patch.
+- Creative phases: a light plan (`create_workflow` with `workflow.mode: "light"` and the user's go-ahead) and `revise_plan` for edits. Big builds: a full Operation Plan, scored review (80 passes), simulated review, then final review and the user's approval.
+- Code comes back as a patch: `apply_patch`, then commit, then `checkpoint` with `integrated_from` so only that step is audited.
+- No paid API fallback, credential use or publishing. Workers reach other AIs only through the board. All browsing uses gstack.
 
 Full rules: the `deltaroute` skill.
 <!-- subscription-worker-router:end -->
