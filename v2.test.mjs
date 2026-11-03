@@ -254,3 +254,103 @@ test('benchmark changes still parse when Perplexity puts the source link on its 
   const answer = 'Changes:\n{"id":"claude-opus-5-5","capability":"cost_efficiency","direction":"up","points":3,"source_url":"\nhttps://www.anthropic.com/claude/opus\n","source_date":"2026-09-22","note":"Anthropic reports lower pricing."}';
   assert.deepEqual(parseNewsChanges(answer).map(c => [c.id, c.capability, c.source_url, c.points]), [['claude-opus-5-5', 'cost_efficiency', 'https://www.anthropic.com/claude/opus', 3]]);
 });
+
+test('helper slots cap a burst before submissions finish and keep successful helpers counted', async () => {
+  const {reserveHelperSlot} = await import('./board.mjs');
+  const dir = path.join(tmp, 'helper-burst');
+  let finish, launched = 0;
+  const pending = new Promise(resolve => { finish = resolve; });
+  const requests = Array.from({length: 12}, async (_, i) => {
+    const slot = reserveHelperSlot(dir, {maxHelpers: 4});
+    if (!slot) return false;
+    launched++;
+    await pending;
+    slot.commit('helper-' + i);
+    return true;
+  });
+  assert.equal(launched, 4, 'pending submissions already occupy slots');
+  finish();
+  assert.equal((await Promise.all(requests)).filter(Boolean).length, 4);
+  const helpers = Array.from({length: 4}, (_, i) => ({taskId: 'helper-' + i}));
+  assert.equal(reserveHelperSlot(dir, {maxHelpers: 4, helpers}), null);
+  assert.equal(reserveHelperSlot(dir, {maxHelpers: 4}), null, 'success survives a stale helpers snapshot');
+});
+
+test('helper slots release failed submissions and include helpers from before slot tracking', async () => {
+  const {reserveHelperSlot} = await import('./board.mjs');
+  const dir = path.join(tmp, 'helper-release'), helpers = [{taskId: 'old-helper'}];
+  assert.equal(reserveHelperSlot(dir, {maxHelpers: 0}), null);
+  const first = reserveHelperSlot(dir, {maxHelpers: 2, helpers});
+  assert.ok(first);
+  assert.equal(reserveHelperSlot(dir, {maxHelpers: 2, helpers}), null);
+  first.release(); first.release();
+  const retry = reserveHelperSlot(dir, {maxHelpers: 2, helpers});
+  assert.ok(retry);
+  retry.commit('new-helper'); retry.release();
+  assert.equal(reserveHelperSlot(dir, {maxHelpers: 2, helpers: [...helpers, {taskId: 'new-helper'}]}), null);
+});
+
+test('helper slots reclaim reservations only when their owner pid is gone', async t => {
+  const {reserveHelperSlot} = await import('./board.mjs');
+  const deadPid = 2_000_000_000;
+  try { process.kill(deadPid, 0); return t.skip('test pid is in use'); }
+  catch (e) { if (e.code !== 'ESRCH') return t.skip('platform cannot confirm dead test pid'); }
+  const dir = path.join(tmp, 'helper-stale'), lock = path.join(dir, 'helper-slots', '0.lock');
+  fs.mkdirSync(lock, {recursive: true});
+  fs.writeFileSync(path.join(lock, 'owner-' + deadPid + '-dead.json'), '');
+  const slot = reserveHelperSlot(dir, {maxHelpers: 1});
+  assert.ok(slot);
+  assert.equal(reserveHelperSlot(dir, {maxHelpers: 1}), null, 'a live reservation is never reaped');
+  slot.release();
+});
+
+test('twenty weekly check callers share one submission, including forced calls', async () => {
+  for (const force of [false, true]) {
+    const root = path.join(tmp, 'news-burst-' + force), now = Date.parse('2026-11-01T00:00:00Z');
+    let finish, starts = 0;
+    const pending = new Promise(resolve => { finish = resolve; });
+    const jobs = {}, submit = async () => { starts++; await pending; return jobs.only = {id: 'only', status: 'running'}; };
+    const options = {registry: {models: []}, submit, readJob: id => jobs[id], now, force};
+    const calls = Array.from({length: 20}, () => serviceNews(root, options));
+    assert.equal(starts, 1, 'claim is acquired before submit resolves');
+    finish();
+    const results = await Promise.all(calls);
+    assert.equal(results.filter(r => r?.started).length, 1);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'routing-memory', 'benchmark-news.json'), 'utf8')).pendingTaskId, 'only');
+    assert.equal(await serviceNews(root, options), null, 'force also respects an already pending job');
+  }
+});
+
+test('weekly claims expire and failed submissions keep the existing weekly retry delay', async () => {
+  const {newsDue} = await import('./benchmark-news.mjs');
+  const root = path.join(tmp, 'news-expiry'), dir = path.join(root, 'routing-memory');
+  const now = Date.parse('2026-11-01T00:00:00Z');
+  fs.mkdirSync(dir, {recursive: true});
+  const file = path.join(dir, 'benchmark-news.claim.json');
+  fs.writeFileSync(file, JSON.stringify({token: 'abandoned', period: 'initial', claimedAt: now}));
+  assert.equal(newsDue(root, {now: now + 9 * 60_000}), false);
+  assert.equal(newsDue(root, {now: now + 10 * 60_000}), true);
+  let starts = 0;
+  const options = {registry: {models: []}, now: now + 10 * 60_000, readJob: () => null,
+    submit: async () => { starts++; throw Error('No research worker'); }};
+  assert.deepEqual(await serviceNews(root, options), {notStarted: 'No research worker'});
+  assert.equal(fs.existsSync(file), false);
+  assert.equal(await serviceNews(root, options), null);
+  assert.equal(starts, 1);
+});
+
+test('an expired weekly claimant cannot overwrite its replacement', async () => {
+  const root = path.join(tmp, 'news-replaced'), now = Date.parse('2026-11-01T00:00:00Z');
+  let finishOld, finishNew;
+  const oldPending = new Promise(resolve => { finishOld = resolve; });
+  const newPending = new Promise(resolve => { finishNew = resolve; });
+  const options = {registry: {models: []}, readJob: () => null};
+  const oldCall = serviceNews(root, {...options, now, submit: async () => { await oldPending; return {id: 'old'}; }});
+  const newCall = serviceNews(root, {...options, now: now + 10 * 60_000, submit: async () => { await newPending; return {id: 'new'}; }});
+  finishOld(); await oldCall;
+  const dir = path.join(root, 'routing-memory');
+  assert.equal(fs.existsSync(path.join(dir, 'benchmark-news.json')), false, 'expired owner cannot publish state');
+  assert.ok(JSON.parse(fs.readFileSync(path.join(dir, 'benchmark-news.claim.json'), 'utf8')).token);
+  finishNew(); await newCall;
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'benchmark-news.json'), 'utf8')).pendingTaskId, 'new');
+});

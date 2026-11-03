@@ -4,16 +4,57 @@
 // visited, logged and undoable. The next list_workers or recommend_route shows what changed.
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {atomicWriteJSON} from './state-file.mjs';
 import {CAPABILITIES, applyBenchmarkChanges} from './registry.mjs';
+import {acquireProcessLease} from './process-lease.mjs';
 
 const stateFile = root => path.join(root, 'routing-memory', 'benchmark-news.json');
 const readState = root => { try { return JSON.parse(fs.readFileSync(stateFile(root), 'utf8')); } catch { return {}; } };
 const writeState = (root, state) => { fs.mkdirSync(path.dirname(stateFile(root)), {recursive: true}); atomicWriteJSON(stateFile(root), state); };
+const claimFile = root => path.join(root, 'routing-memory', 'benchmark-news.claim.json');
+const CLAIM_TIMEOUT = 10 * 60_000;
+const readClaim = root => { try { return JSON.parse(fs.readFileSync(claimFile(root), 'utf8')); } catch { return null; } };
+function claimActive(root, now) {
+  const claim = readClaim(root);
+  if (Number.isFinite(claim?.claimedAt)) return now - claim.claimedAt < CLAIM_TIMEOUT;
+  // A creator may not have finished writing yet; malformed claims can also expire.
+  try { return now - fs.statSync(claimFile(root)).mtimeMs < CLAIM_TIMEOUT; } catch { return false; }
+}
+function claimNews(root, {everyDays, now, force}) {
+  let release;
+  try { release = acquireProcessLease(claimFile(root) + '.lock'); }
+  catch (e) { if (/busy or still active|contention/.test(e.message)) return null; throw e; }
+  try {
+    const state = readState(root);
+    if (state.pendingTaskId || claimActive(root, now) || !force && !newsDue(root, {everyDays, now})) return null;
+    try { fs.unlinkSync(claimFile(root)); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    const claim = {token: crypto.randomUUID(), period: state.checkedAt || 'initial', claimedAt: now};
+    fs.writeFileSync(claimFile(root), JSON.stringify(claim), {flag: 'wx'});
+    return claim;
+  } finally { release(); }
+}
+async function finishClaim(root, claim, state) {
+  let release;
+  const deadline = Date.now() + 5000;
+  while (!release) {
+    try { release = acquireProcessLease(claimFile(root) + '.lock'); }
+    catch (e) {
+      if (!/busy or still active|contention/.test(e.message) || Date.now() >= deadline) throw e;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+  }
+  try {
+    if (readClaim(root)?.token !== claim.token) return false;
+    writeState(root, {...readState(root), ...state});
+    fs.unlinkSync(claimFile(root));
+    return true;
+  } finally { release(); }
+}
 
 export function newsDue(root, {everyDays = 7, now = Date.now()} = {}) {
   const s = readState(root);
-  if (s.pendingTaskId) return false;
+  if (s.pendingTaskId || claimActive(root, now)) return false;
   return !s.checkedAt || now - Date.parse(s.checkedAt) >= everyDays * 86_400_000;
 }
 
@@ -60,13 +101,15 @@ export async function serviceNews(root, {registry, cfg = {}, submit, readJob, no
     } else if (!job) writeState(root, {...state, pendingTaskId: null});
   }
   if (force || newsDue(root, {everyDays: opts.everyDays ?? 7, now})) {
+    const claim = claimNews(root, {everyDays: opts.everyDays ?? 7, now, force});
+    if (!claim) return result;
     try {
       const job = await submit({task: newsPrompt(registry, {now: new Date(now)}), category: 'research', mode: 'read-only', provider: 'auto', context: 'DeltaRoute weekly benchmark check; the answer updates routing scores.'});
-      writeState(root, {...readState(root), pendingTaskId: job.id, startedAt: new Date(now).toISOString()});
+      await finishClaim(root, claim, {pendingTaskId: job.id, startedAt: new Date(now).toISOString()});
       result = {...(result || {}), started: job.id};
     } catch (e) {
       // No research worker right now: try again next week rather than every call.
-      writeState(root, {...readState(root), checkedAt: new Date(now).toISOString(), lastStatus: 'not_started', lastError: e.message.slice(0, 300)});
+      await finishClaim(root, claim, {checkedAt: new Date(now).toISOString(), lastStatus: 'not_started', lastError: e.message.slice(0, 300)});
       result = {...(result || {}), notStarted: e.message.slice(0, 300)};
     }
   }

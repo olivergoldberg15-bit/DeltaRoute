@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {RUNTIME_DIR} from './deadline.mjs';
+import {acquireProcessLease} from './process-lease.mjs';
 
 export const OUTBOX = path.join(RUNTIME_DIR, 'outbox');
 export const BOARD_VIEW = path.join(RUNTIME_DIR, 'board.md');
@@ -14,6 +15,36 @@ export const NUDGE = path.join(RUNTIME_DIR, 'NUDGE.md');
 const WORKER_KINDS = ['note', 'question', 'answer', 'help'];
 const KINDS = [...WORKER_KINDS, 'monitor', 'chief'];
 export const HELP_ASKS = ['research', 'social_research', 'review', 'large_context', 'summarization', 'debugging', 'quick_coding'];
+
+/** Reserves before submit, not after its promise resolves. Successful helpers consume a slot for the job's life. */
+export function reserveHelperSlot(jobDir, {maxHelpers = 4, helpers = []} = {}) {
+  const dir = path.join(jobDir, 'helper-slots');
+  fs.mkdirSync(dir, {recursive: true});
+  const committed = new Set();
+  for (const name of fs.readdirSync(dir).filter(n => /^\d+\.json$/.test(n))) {
+    try { committed.add(JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')).taskId); } catch {}
+  }
+  // Helpers launched before slot reservations were introduced still count.
+  const legacy = helpers.filter(h => !committed.has(h.taskId)).length;
+  for (let i = legacy; i < maxHelpers; i++) {
+    const file = path.join(dir, i + '.json');
+    if (fs.existsSync(file)) continue;
+    let release;
+    try { release = acquireProcessLease(path.join(dir, i + '.lock')); }
+    catch (e) { if (/busy or still active|contention/.test(e.message)) continue; throw e; }
+    if (fs.existsSync(file)) { release(); continue; }
+    let done = false;
+    return {
+      commit(taskId) {
+        if (done) return;
+        fs.writeFileSync(file, JSON.stringify({taskId}), {flag: 'wx'});
+        release(); done = true;
+      },
+      release() { if (!done) { release(); done = true; } }
+    };
+  }
+  return null;
+}
 
 /** The board file for a team: the workflow's, or the top job's when the work is not part of a workflow. */
 export function boardFile(root, {workflowId = null, jobId = null}) {
