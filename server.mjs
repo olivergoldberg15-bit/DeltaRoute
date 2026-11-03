@@ -46,6 +46,8 @@ const config=()=>{const c=JSON.parse(fs.readFileSync(path.join(ROOT,'config.json
 const write=(file,data)=>atomicWriteJSON(file,data,{beforeCommit:j=>fs.existsSync(path.join(path.dirname(file),'cancelled'))?{...j,status:'cancelled'}:j});
 const jobFile=id=>{if(!/^[a-f0-9-]{36}$/.test(id))throw Error('Invalid task ID');return path.join(JOBS,id,'status.json');};
 const readJob=id=>{const j=JSON.parse(fs.readFileSync(jobFile(id),'utf8'));return fs.existsSync(path.join(JOBS,id,'cancelled'))?{...j,status:'cancelled'}:j;};
+const jobFactsCache=new Map();
+const jobFacts=id=>{const mtimeMs=fs.statSync(jobFile(id)).mtimeMs,cached=jobFactsCache.get(id);if(cached?.mtimeMs===mtimeMs&&!fs.existsSync(path.join(JOBS,id,'cancelled')))return cached.facts;const j=readJob(id),facts={};for(const k of ['id','parentId','provider','status','isOrchestrator','workerPid','finishedAt','updatedAt','createdAt','error','invoked','collectionMethod','modelUsed','authentication'])facts[k]=j[k];facts.sourceValidation={recoveryReason:j.sourceValidation?.recoveryReason};facts.researchPacket={sourceValidation:{recoveryReason:j.researchPacket?.sourceValidation?.recoveryReason}};facts.health=classifyOutcome(j);if(['completed','failed','cancelled','timed_out','needs_coordinator'].includes(j.status))jobFactsCache.set(id,{mtimeMs,facts});else jobFactsCache.delete(id);return facts;};
 const update=(id,data)=>{const prior=readJob(id),job={...prior,...data,updatedAt:new Date().toISOString()};if(fs.existsSync(path.join(JOBS,id,'cancelled')))job.status='cancelled';write(jobFile(id),job);if(job.workflowRef&&!job.parentId&&(job.status!==prior.status||job.phase!==prior.phase))streamJob(job);return job;};
 // Workflow jobs stream every status change to the event log and redraw the dashboard. Never fatal to the worker.
 function streamJob(job){try{appendEvent(ROOT,job.workflowRef.id,{type:'job',step:job.workflowRef.stepId,subagent:job.workflowRef.subagentId,taskId:job.id,provider:job.provider,status:job.status,phase:job.phase});refreshDashboard(job.workflowRef.id);}catch{}}
@@ -60,7 +62,7 @@ export function subscriptionEnv(source=process.env){
 }
 function available(){
  const cfg=config(),recent={},outcomes={},accounts={};
- for(const id of fs.readdirSync(JOBS).filter(n=>/^[a-f0-9-]{36}$/.test(n))){try{const j=readJob(id);if(j.isOrchestrator||['queued','running'].includes(j.status))continue;const at=j.finishedAt||j.updatedAt||j.createdAt||'',health=classifyOutcome(j),failure=classifyFailure(j.error||''),key=accountKey(j.provider);if(!outcomes[j.provider]||at>outcomes[j.provider].at)outcomes[j.provider]={...health,at};const sourceRecovery=j.sourceValidation?.recoveryReason||j.researchPacket?.sourceValidation?.recoveryReason;if(sourceRecovery){const sourceFailure=classifyFailure(sourceRecovery==='auth'?'authentication expired':sourceRecovery==='quota'?'quota exhausted':sourceRecovery==='challenge'?'browser challenge':sourceRecovery==='outage'?'provider outage':sourceRecovery);if(sourceFailure.blockAccount&&(!accounts.perplexity||at>accounts.perplexity.at))accounts.perplexity={at,status:'failed',failure:sourceFailure,error:'Source provider '+sourceRecovery};}if(!/^Fresh source collection failed/.test(j.error||'')&&(failure.blockAccount||j.status==='completed'&&j.invoked!==false&&!j.collectionMethod)&&(!accounts[key]||at>accounts[key].at))accounts[key]={at,status:j.status,failure,error:j.error};if(j.status==='completed'&&health.availableNow&&(!recent[j.provider]||at>recent[j.provider].completedAt))recent[j.provider]={taskId:j.id,completedAt:at,model:j.modelUsed||null,authentication:j.authentication||'Account-authenticated CLI; exact billing not independently verified'};}catch{}}
+ for(const id of fs.readdirSync(JOBS).filter(n=>/^[a-f0-9-]{36}$/.test(n))){try{const j=jobFacts(id);if(j.isOrchestrator||['queued','running'].includes(j.status))continue;const at=j.finishedAt||j.updatedAt||j.createdAt||'',health=j.health,failure=classifyFailure(j.error||''),key=accountKey(j.provider);if(!outcomes[j.provider]||at>outcomes[j.provider].at)outcomes[j.provider]={...health,at};const sourceRecovery=j.sourceValidation?.recoveryReason||j.researchPacket?.sourceValidation?.recoveryReason;if(sourceRecovery){const sourceFailure=classifyFailure(sourceRecovery==='auth'?'authentication expired':sourceRecovery==='quota'?'quota exhausted':sourceRecovery==='challenge'?'browser challenge':sourceRecovery==='outage'?'provider outage':sourceRecovery);if(sourceFailure.blockAccount&&(!accounts.perplexity||at>accounts.perplexity.at))accounts.perplexity={at,status:'failed',failure:sourceFailure,error:'Source provider '+sourceRecovery};}if(!/^Fresh source collection failed/.test(j.error||'')&&(failure.blockAccount||j.status==='completed'&&j.invoked!==false&&!j.collectionMethod)&&(!accounts[key]||at>accounts[key].at))accounts[key]={at,status:j.status,failure,error:j.error};if(j.status==='completed'&&health.availableNow&&(!recent[j.provider]||at>recent[j.provider].completedAt))recent[j.provider]={taskId:j.id,completedAt:at,model:j.modelUsed||null,authentication:j.authentication||'Account-authenticated CLI; exact billing not independently verified'};}catch{}}
  return Object.entries(cfg.workers).map(([name,w])=>{const h=accounts[accountKey(name)],cooldown=h?.failure.blockAccount?failureCooldownMs(h.failure.kind,h.error,cfg.fallback?.cooldownMs):0;const retryAfter=h&&cooldown?new Date(Date.parse(h.at)+cooldown).toISOString():null;const cooling=h?.status!=='completed'&&retryAfter&&Date.parse(retryAfter)>Date.now();return {name,...w,installed:w.transport==='cursor'||['cursor','codex','gemini','higgsfield'].includes(name)?workerInstalled(w):['perplexity','grok','muse'].includes(name)?fs.existsSync(cfg.browser?.command||''):false,availableNow:!cooling,retryAfter:cooling?retryAfter:null,lastOutcome:cooling?{...outcomes[name],state:h.failure.kind+'_cooldown'}:outcomes[name]||null,lastSuccessfulExecution:recent[name]||null,authentication:'Bounded account cooldowns; a later task probes again after cooldown. Explicit fallback=false retries a preferred provider now.',model:w.model||'provider account default'};});
 }
 const compactRoles=roles=>Object.fromEntries(Object.entries(roles).map(([role,r])=>[role,r.pick?{id:r.pick.id,execution:r.pick.execution,fit:r.pick.fit}:null]));
@@ -85,9 +87,10 @@ function acquireSlot(max){
  return null;
 }
 async function attemptWorker(id){
- let slot=null,child=null,timer=null;const cfg=config();cfg.timeoutSeconds=readJob(id).limits?.attemptTimeoutSeconds||cfg.timeoutSeconds;const start=Date.now();
+ let slot=null,child=null,timer=null;const cfg=config();cfg.timeoutSeconds=readJob(id).limits?.attemptTimeoutSeconds||cfg.timeoutSeconds;const queuedAt=Date.now();
  try{
-  while(!(slot=acquireSlot(cfg.maxConcurrent))){if(Date.now()-start>cfg.timeoutSeconds*1000)throw Error('Queue timeout');await new Promise(r=>setTimeout(r,1000));if(readJob(id).status==='cancelled')return;}
+  while(!(slot=acquireSlot(cfg.maxConcurrent))){if(Date.now()-queuedAt>cfg.timeoutSeconds*1000)throw Error('Queue timeout');await new Promise(r=>setTimeout(r,1000));if(readJob(id).status==='cancelled')return;}
+  const start=Date.now();update(id,{slotAt:new Date(start).toISOString()});
   let job=readJob(id);if(job.status==='cancelled')return;
   let cwd=job.cwd,branch=null;
   if(job.mode==='code'||job.workflowRef&&job.baseRef){
@@ -244,7 +247,8 @@ async function worker(id){
   const childId=crypto.randomUUID();fs.mkdirSync(path.join(JOBS,childId));
   write(jobFile(childId),{id:childId,parentId:id,provider,model:provider===job.modelProvider?job.model:undefined,category:job.category,task:job.task,context:job.context,cwd:job.cwd,mode:job.mode,baseRef,limits:job.limits,workflowRef:job.workflowRef,mediaOptions:job.mediaOptions,researchScope:job.researchScope,researchPacket:packet,imageSpec:job.imageSpec,visual:job.visual,effort:job.effort,boardReply:job.boardReply,invoked:false,status:'queued',createdAt:new Date().toISOString()});
   const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'--attempt',childId],{windowsHide:true,detached:OWN_GROUP,stdio:'ignore',env:process.env});update(childId,{workerPid:child.pid});
-  const deadline=watchDeadline({seconds:(job.limits?.attemptTimeoutSeconds||cfg.fallback?.attemptTimeoutSeconds||cfg.timeoutSeconds)+30,warnRatio:1,onExpire:()=>{const active=readJob(childId);killTree(active.childPid);killTree(active.authPid);killTree(active.prepPid);killTree(child.pid);if(!['cancelled','timed_out'].includes(readJob(childId).status))update(childId,{status:'timed_out',error:'Worker exceeded time limit including queue/auth/browser phases',finishedAt:new Date().toISOString()});}});
+  const seconds=(job.limits?.attemptTimeoutSeconds||cfg.fallback?.attemptTimeoutSeconds||cfg.timeoutSeconds)+30,expire=()=>{const active=readJob(childId);killTree(active.childPid);killTree(active.authPid);killTree(active.prepPid);killTree(child.pid);if(!['cancelled','timed_out'].includes(readJob(childId).status))update(childId,{status:'timed_out',error:'Worker exceeded time limit including queue/auth/browser phases',finishedAt:new Date().toISOString()});};
+  let deadline=watchDeadline({seconds,warnRatio:1,onExpire:()=>{const slotAt=readJob(childId).slotAt;if(!slotAt)return expire();deadline=watchDeadline({startedAt:Date.parse(slotAt),seconds,warnRatio:1,onExpire:expire});}});
   if(cancelled()){deadline.stop();killTree(child.pid);update(childId,{status:'cancelled'});return {status:'cancelled',id:childId,invoked:false};}
   update(id,{phase:'attempt_'+(index+1)+'_'+provider,activeAttempt:childId,childPid:child.pid});
   try{await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve);});}finally{deadline.stop();}
@@ -371,7 +375,7 @@ async function call(name,a={}){
   if((['perplexity','grok','muse'].includes(provider)&&category!=='image'||category==='video_analysis')&&mode!=='read-only')throw Error('Research browser workers only support read-only mode');
   if(a.effort!==undefined&&!['low','medium','high'].includes(a.effort))throw Error('effort must be low, medium or high');const limits=a.profile&&a.profile!=='standard'?workloadProfile(a.profile):undefined;const selectedMedia=a.media_options?mediaOptions(a.media_options):undefined;
   if(selectedMedia&&category!=='video_analysis')throw Error('Media options require video_analysis category');
-  const active=fs.readdirSync(JOBS).filter(n=>/^[a-f0-9-]{36}$/.test(n)).map(n=>{try{return readJob(n);}catch{return null;}}).filter(j=>j&&!j.parentId&&['queued','running'].includes(j.status)&&alive(j.workerPid));
+  const active=fs.readdirSync(JOBS).filter(n=>/^[a-f0-9-]{36}$/.test(n)).map(n=>{try{return jobFacts(n);}catch{return null;}}).filter(j=>j&&!j.parentId&&['queued','running'].includes(j.status)&&alive(j.workerPid));
   if(active.length>=20)throw Error('Queue full; wait for existing tasks');
   const boardReply=a.board_reply?{workflowId:a.board_reply.workflowId||null,jobId:a.board_reply.jobId||null,to:String(a.board_reply.to||'all').slice(0,80),messageId:String(a.board_reply.messageId||'').slice(0,16)}:undefined;if(boardReply)boardFile(ROOT,boardReply);
   const id=crypto.randomUUID();fs.mkdirSync(path.join(JOBS,id));
@@ -409,8 +413,9 @@ export async function handleMessage(msg,{allow=null}={}){
  return {jsonrpc:'2.0',id:msg.id,...(error?{error}:{result})};
 }
 async function serve(){
- const lines=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
- for await(const line of lines){let msg;try{msg=JSON.parse(line);}catch{continue;}const reply=await handleMessage(msg);if(reply)process.stdout.write(JSON.stringify(reply)+'\n');}
+ const lines=readline.createInterface({input:process.stdin,crlfDelay:Infinity}),pending=new Set();
+ for await(const line of lines){let msg;try{msg=JSON.parse(line);}catch{continue;}const task=handleMessage(msg).then(reply=>{if(reply)process.stdout.write(JSON.stringify(reply)+'\n');}).catch(e=>{if(msg?.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:msg.id,error:{code:-32603,message:e.message}})+'\n');}).finally(()=>pending.delete(task));pending.add(task);}
+ await Promise.allSettled(pending);
 }
 if(process.argv[2]==='--attempt')await attemptWorker(process.argv[3]);
 else if(process.argv[2]==='--worker')await worker(process.argv[3]);
