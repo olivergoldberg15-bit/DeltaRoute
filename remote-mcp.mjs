@@ -21,6 +21,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
@@ -81,11 +82,46 @@ export function authorize(header,clients){
 // What a connected AI may not do through an allowed tool. Returns the refusal, or null.
 export function refusal(msg,client){
  if(client.full||msg?.method!=='tools/call')return null;const {name,arguments:a={}}=msg.params||{};
+ if(!a||typeof a!=='object'||Array.isArray(a))return 'Tool arguments must be an object.';
  if(name==='submit_task'){
   if((a.action||'delegate')!=='delegate')return 'Connected AIs can delegate tasks only; plans, reviews and approvals stay with the owner.';
   if(a.mode==='code'&&!client.allowCode)return 'Code jobs are off for this connection; the owner can allow them with add-client --allow-code.';
  }
+ if(['submit_task','generate_media'].includes(name)){
+  if(!homeRepository(a.cwd===undefined?process.cwd():a.cwd))return 'cwd must be an existing repository folder inside the owner home folder; the home folder itself is not allowed.';
+  for(const dir of [a.deliver_to,a.images?.deliver_to])if(dir!==undefined&&!homeRepository(dir))return 'deliver_to must be an existing repository folder inside the owner home folder; the home folder itself is not allowed.';
+ }
+ if(!safeAllowedPaths(a))return 'allowed_paths must be relative, contain no .. and stay outside .github/.';
  return null;
+}
+// Resolve junctions before checking containment, and stop looking for Git at the home boundary.
+export function homeRepository(dir,home=os.homedir()){
+ try{
+  if(typeof dir!=='string'||!dir)return false;
+  const root=fs.realpathSync(home),real=fs.realpathSync(dir),inside=p=>{const rel=path.relative(root,p);return rel!==''&&rel!=='..'&&!rel.startsWith('..'+path.sep)&&!path.isAbsolute(rel);};
+  if(!inside(real)||!fs.statSync(real).isDirectory())return false;
+  for(let p=real;inside(p);p=path.dirname(p)){try{const st=fs.statSync(path.join(p,'.git'));if(st.isDirectory()||st.isFile())return true;}catch{}}
+ }catch{}return false;
+}
+export function safeAllowedPaths(value){
+ if(!value||typeof value!=='object')return true;
+ for(const [key,v] of Object.entries(value)){
+  if(key==='allowed_paths'){
+   if(!Array.isArray(v)||v.some(p=>{if(typeof p!=='string'||!p||p.includes('..')||path.posix.isAbsolute(p)||path.win32.isAbsolute(p)||/^[a-z]:/i.test(p))return true;return p.replace(/\\/g,'/').split('/').filter(x=>x&&x!=='.')[0]?.toLowerCase()==='.github';}))return false;
+  }else if(!safeAllowedPaths(v))return false;
+ }return true;
+}
+// One tool at a time per HTTP server, yielding to socket I/O (including rejections) between calls.
+export function toolQueue(){
+ const pending=[];let active=false;
+ const next=()=>{if(active||!pending.length)return;active=true;setTimeout(async()=>{const {work,resolve,reject}=pending.shift();try{resolve(await work());}catch(e){reject(e);}finally{active=false;next();}},0);};
+ return work=>new Promise((resolve,reject)=>{pending.push({work,resolve,reject});next();});
+}
+export function redactRemoteErrors(reply){
+ const clean=v=>typeof v==='string'?v.replace(/(["'])(?:[a-z]:[\\/]|[\\/])[^"'\r\n]*\1/gi,'$1[redacted path]$1').replace(/(?<![\w.:/\\])(?:[a-z]:[\\/]|[\\/])[^\s"'<>|,;)\]}]*/gi,'[redacted path]'):Array.isArray(v)?v.map(clean):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,clean(x)])):v;
+ if(reply?.error)return {...reply,error:clean(reply.error)};
+ if(reply?.result?.isError)return {...reply,result:clean(reply.result)};
+ return reply;
 }
 const refused=(id,text)=>({jsonrpc:'2.0',id,result:{isError:true,content:[{type:'text',text}]}});
 
@@ -109,7 +145,7 @@ export function resolveOutput(taskId,name,jobsDir=JOBS_DIR){
 // The address the caller used (through the tunnel), so links in results open from the phone.
 export function publicBase(req,prefix=''){const host=req.headers['x-forwarded-host']||req.headers.host;if(!host)return null;const proto=req.headers['x-forwarded-proto']||(/^(localhost|127\.0\.0\.1)(:|$)/.test(host)?'http':'https');return proto+'://'+host+prefix;}
 export function createRemoteServer({handle,clientsFile=CLIENTS_FILE,jobsDir=JOBS_DIR,log=(...a)=>console.error(new Date().toISOString(),...a)}){
- const clients=clientStore(clientsFile),started=Date.now();
+ const clients=clientStore(clientsFile),started=Date.now(),runTool=toolQueue();
  return http.createServer(async(req,res)=>{
   const base={'Cache-Control':'no-store','X-DeltaRoute':VERSION};
   const send=(status,body,headers={})=>{if(res.headersSent)return;res.writeHead(status,{...base,...(body===undefined?{}:{'Content-Type':'application/json'}),...headers});res.end(body===undefined?undefined:JSON.stringify(body));};
@@ -137,7 +173,8 @@ export function createRemoteServer({handle,clientsFile=CLIENTS_FILE,jobsDir=JOBS
    if(req.method==='DELETE')return send(204);
    // No server-to-client stream is offered; every reply comes back on its POST.
    if(req.method!=='POST')return send(405,{error:'method_not_allowed'},{Allow:'POST, DELETE'});
-   let size=0;const chunks=[];for await(const c of req){size+=c.length;if(size>MAX_BODY)return send(413,{error:'too_large'});chunks.push(c);}
+   if(Number(req.headers['content-length'])>MAX_BODY)return send(413,{error:'too_large'});
+   let size=0;const chunks=[];for await(const c of req.iterator({destroyOnReturn:false})){size+=c.length;if(size>MAX_BODY){req.resume();return send(413,{error:'too_large'});}chunks.push(c);}
    let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return send(400,{jsonrpc:'2.0',id:null,error:{code:-32700,message:'Parse error'}});}
    const batch=Array.isArray(body),messages=batch?body:[body];
    const session=messages.some(m=>m?.method==='initialize')?{'Mcp-Session-Id':crypto.randomUUID()}:{};
@@ -145,7 +182,16 @@ export function createRemoteServer({handle,clientsFile=CLIENTS_FILE,jobsDir=JOBS
    const accept=String(req.headers.accept||'');const stream=/text\/event-stream/i.test(accept)&&!/application\/json|\*\/\*/i.test(accept);
    let tick;if(stream&&messages.some(m=>m?.id!==undefined)){res.writeHead(200,{...base,...session,'Content-Type':'text/event-stream','Connection':'keep-alive'});tick=setInterval(()=>res.write(': keep-alive\n\n'),15000);}
    const replies=[];try{
-    for(const msg of messages){const no=refusal(msg,client);const reply=no?(msg?.id===undefined?null:refused(msg.id,no)):await handle(msg,{allow:client.full?null:[...new Set([...(client.tools||REMOTE_TOOLS),'generate_media'])]});if(reply)replies.push(withLinks(reply,publicBase(req,prefix)));}
+    for(const msg of messages){
+     const dispatch=async()=>{
+      const a=msg?.params?.arguments;
+      if(msg?.method==='tools/call'&&a!==undefined&&(!a||typeof a!=='object'||Array.isArray(a)))return msg.id===undefined?null:{jsonrpc:'2.0',id:msg.id,error:{code:-32602,message:'Tool arguments must be an object'}};
+      const no=refusal(msg,client);if(no)return msg?.id===undefined?null:refused(msg.id,no);
+      try{return await handle(msg,{allow:client.full?null:[...new Set([...(client.tools||REMOTE_TOOLS),'generate_media'])]});}
+      catch{return msg?.id===undefined?null:{jsonrpc:'2.0',id:msg.id,error:{code:-32603,message:'Internal error'}};}
+     };
+     const reply=await (msg?.method==='tools/call'?runTool(dispatch):dispatch());if(reply)replies.push(withLinks(redactRemoteErrors(reply),publicBase(req,prefix)));
+    }
    }finally{clearInterval(tick);}
    if(tick){for(const r of replies)res.write(`event: message\ndata: ${JSON.stringify(r)}\n\n`);return res.end();}
    if(!replies.length)return send(202,undefined,session);
