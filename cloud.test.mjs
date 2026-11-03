@@ -18,7 +18,7 @@ test('outside Windows a timed-out worker is stopped with its whole process group
  const signals=[];const gone=Object.assign(Error('gone'),{code:'ESRCH'});
  assert.equal(killTree(42,{platform:'linux',kill:(p,s)=>{signals.push([p,s]);if(p===42)throw gone;},isAlive:()=>false}),true);
  assert.deepEqual(signals,[[-42,'SIGKILL'],[42,'SIGKILL']]);
- const ran=[];assert.equal(killTree(42,{platform:'win32',run:(c,a)=>{ran.push([c,...a]);return {status:0};},kill:()=>assert.fail('taskkill already stopped it')}),true);
+ const ran=[];assert.equal(killTree(42,{platform:'win32',run:(c,a)=>{ran.push([c,...a]);return {status:0};},kill:()=>assert.fail('taskkill already stopped it'),isAlive:()=>false}),true);
  assert.deepEqual(ran,[['taskkill','/PID','42','/T','/F']]);
 });
 

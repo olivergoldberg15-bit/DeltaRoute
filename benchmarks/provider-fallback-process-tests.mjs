@@ -25,7 +25,7 @@ class FakeProvider {
   string joined=String.Join(" ",args);
   bool codex=name.StartsWith("codex");
   if(codex && joined=="login status") {
-   if(name.Contains("loginhang")){File.WriteAllText(name+".pid",System.Diagnostics.Process.GetCurrentProcess().Id.ToString());Thread.Sleep(30000);return 1;}
+   if(name.Contains("loginhang")){File.WriteAllText(name+".pid",System.Diagnostics.Process.GetCurrentProcess().Id.ToString());Thread.Sleep(60000);return 1;}
    if(name.Contains("auth")){Console.WriteLine("Not logged in");return 1;}
    Console.WriteLine("Logged in using ChatGPT");return 0;
   }
@@ -34,7 +34,7 @@ class FakeProvider {
    if(name.Contains("-code")) File.WriteAllText("partial.txt","failed provider wrote this");
    Console.WriteLine("{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":10,\"cached_input_tokens\":4,\"output_tokens\":2}}");
    Console.Out.Flush();
-   if(name.Contains("hang")){File.WriteAllText("started.txt","started");File.WriteAllText(name+".pid",System.Diagnostics.Process.GetCurrentProcess().Id.ToString());Thread.Sleep(30000);return 1;}
+   if(name.Contains("hang")){File.WriteAllText("started.txt","started");File.WriteAllText(name+".pid",System.Diagnostics.Process.GetCurrentProcess().Id.ToString());Thread.Sleep(60000);return 1;}
    if(name.Contains("success")) {
     for(int i=0;i<args.Length-1;i++) if(args[i]=="-o") File.WriteAllText(args[i+1],"RECOVERED");
     return 0;
@@ -42,7 +42,7 @@ class FakeProvider {
    string error=name.Contains("quota")?"Account quota exceeded":"HTTP 503 service unavailable";
    Console.WriteLine("{\"type\":\"error\",\"message\":\""+error+"\"}");return 1;
   }
-  if(name.Contains("hang")){File.WriteAllText("started.txt","started");Thread.Sleep(30000);return 1;}
+  if(name.Contains("hang")){File.WriteAllText("started.txt","started");Thread.Sleep(60000);return 1;}
   if(name.Contains("code")) {
    if(File.Exists("partial.txt")){Console.WriteLine("{\"status\":\"ERROR\",\"error\":\"Worktree contamination detected\",\"response\":\"Failed\"}");return 1;}
    File.WriteAllText("recovery.txt","clean fallback worktree");
@@ -52,6 +52,7 @@ class FakeProvider {
  }
 }`;
 const source=path.join(bin,'FakeProvider.cs');fs.writeFileSync(source,shim);
+// Hang fixtures sleep 60 s, past every limit below, so only DeltaRoute's kill can end them (a 30 s sleep raced the 30 s attempt limit).
 const baseExe=path.join(bin,'FakeProvider.exe');
 const windowsRoot=process.env.WINDIR||process.env.SystemRoot;
 assert.ok(windowsRoot,'The Windows installation directory is unavailable');
