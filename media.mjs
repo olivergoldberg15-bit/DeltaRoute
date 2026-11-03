@@ -65,7 +65,7 @@ export function decodeDataImage(src) {
 
 /**
  * Grok Imagine on grok.com (experimental). Sends the prompt on /imagine, waits until its new results stop changing,
- * then saves the first one: decoded straight from the page when embedded, else read same-origin from its address.
+ * then saves the first one: decoded when embedded, else fetched, drawn to canvas or captured from the loaded img.
  */
 export async function grokImagine({spec, outDir, cfg, root, timeoutMs = 240000}) {
   fs.mkdirSync(outDir, {recursive: true});
@@ -105,8 +105,30 @@ export async function grokImagine({spec, outDir, cfg, root, timeoutMs = 240000})
         const src = String(await js(`(()=>{const keys=${GROK_IMAGE_SCAN};const imgs=[...document.querySelectorAll("img")].filter(i=>i.naturalWidth>=512&&(i.src.startsWith("data:image/")||/assets\\.grok\\.com\\/users\\/[^/]+\\/generated\\//.test(i.src)));return imgs[keys.indexOf(${JSON.stringify(fresh[0])})]?.src||""})()`));
         bytes = decodeDataImage(src) || Buffer.alloc(0);
       } else {
-        await goto(fresh[0]);
-        bytes = Buffer.from(String(await js('(async()=>{const r=await fetch(location.href);const b=new Uint8Array(await r.arrayBuffer());let s="";for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode(...b.subarray(i,i+32768));return btoa(s);})()')), 'base64');
+        // Stay on Imagine: navigating away can discard the loaded pixels or revoke a blob URL.
+        const src = JSON.stringify(fresh[0]), failures = [];
+        const attempt = async (step, read) => {
+          try {
+            const result = await read();
+            if (!isImageBytes(result)) throw Error('returned something that is not an image');
+            return result;
+          } catch (e) {
+            failures.push(`${step}: ${String(e.message || e).split('\n')[0].replace(/^page\.evaluate:\s*/, '').slice(0, 300)}`);
+            return null;
+          }
+        };
+        bytes = await attempt('in-page fetch', async () => Buffer.from(String(await js(`(async()=>{const r=await fetch(${src});if(!r.ok)throw Error("HTTP "+r.status);const b=new Uint8Array(await r.arrayBuffer());let s="";for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode(...b.subarray(i,i+32768));return btoa(s);})()`)), 'base64'));
+        if (!bytes) bytes = await attempt('loaded-image canvas', async () => decodeDataImage(await js(`(()=>{const i=[...document.querySelectorAll("img")].find(i=>i.src===${src});if(!i||!i.complete||!i.naturalWidth)throw Error("Generated image is no longer loaded");i.setAttribute("data-deltaroute-save","");const c=document.createElement("canvas");c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext("2d").drawImage(i,0,0);return c.toDataURL("image/jpeg",0.95);})()`)));
+        // gstack captures rendered pixels without reading a cross-origin canvas. This last resort is a PNG.
+        if (!bytes) bytes = await attempt('gstack element screenshot', async () => {
+          const dir = fs.mkdtempSync(path.join(outDir, '.grok-save-'));
+          try {
+            const file = path.resolve(dir, 'image.png');
+            await browse('screenshot', file, '--selector', 'img[data-deltaroute-save]');
+            return fs.readFileSync(file);
+          } finally { fs.rmSync(dir, {recursive: true, force: true}); }
+        });
+        if (!bytes) throw Error('Grok Imagine could not save its generated image. ' + failures.join('; '));
       }
       if (!isImageBytes(bytes)) throw Error('Grok Imagine returned something that is not an image');
       fs.writeFileSync(path.join(outDir, o.file), bytes);
