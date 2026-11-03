@@ -88,3 +88,65 @@ test('planning stays in Claude unless an independent provider was requested', ()
   assert.deepEqual(candidateProviders({mode: 'unsafe', workers}), []);
   assert.deepEqual(candidateProviders({requested: 'claude', workers}), []);
 });
+
+test('capacity, overload, panic and interrupted requests fall back with a short outage cooldown', () => {
+  for (const error of [
+    'Selected model is at capacity. Please try a different model.',
+    'The model is overloaded. Please try again later.',
+    "thread 'main' panicked at core/src/lib.rs:42:5:\ncalled `Option::unwrap()` on a `None` value\nnote: run with `RUST_BACKTRACE=1`",
+    'socket hang up',
+    'Request was aborted.',
+  ]) {
+    assert.deepEqual(classifyFailure(error), {
+      kind: 'outage', retryable: true, fallbackEligible: true, blockAccount: true, cooldownMs: 60_000,
+    }, error);
+  }
+});
+
+test('local research browser contention falls back without blocking the account', () => {
+  assert.deepEqual(classifyFailure('Research browser is busy'), {
+    kind: 'timeout', retryable: true, fallbackEligible: true, blockAccount: false, cooldownMs: 30_000,
+  });
+});
+
+test('incidental sandbox and login log text does not hide a transient failure', () => {
+  for (const line of [
+    '2026-11-02T10:00:00.000Z WARN codex_core::exec: windows sandbox setup took 812ms',
+    '2026-11-02T10:00:00.000Z INFO tool: reading src/pages/login.tsx',
+    '2026-11-02T10:00:00.000Z INFO tool: reading src/pages/sign-in.tsx',
+    '2026-11-02T10:00:00.000Z INFO tool: reading src/pages/user.login.tsx',
+    '2026-11-02T10:00:00.000Z INFO tool: login.tsx',
+  ]) {
+    const error = line + '\n2026-11-02T10:00:01.000Z ERROR codex_core::client: stream disconnected before completion';
+    assert.deepEqual(classifyFailure(error), {
+      kind: 'outage', retryable: true, fallbackEligible: true, blockAccount: true, cooldownMs: 60_000,
+    }, error);
+  }
+});
+
+test('real authentication and sandbox refusals retain their strong classifications', () => {
+  for (const error of [
+    'Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.',
+    'Authentication expired. Please run agy login.',
+    'Higgsfield requires account login. Run higgsfield auth login.',
+    'Please sign in again.',
+  ]) {
+    assert.deepEqual(classifyFailure(error), {
+      kind: 'auth', retryable: true, fallbackEligible: true, blockAccount: true, cooldownMs: 1_800_000,
+    }, error);
+  }
+  for (const error of ['Sandbox permission denied after model not found', 'Sandbox blocked this command', 'Refused due to content policy']) {
+    assert.deepEqual(classifyFailure(error), {
+      kind: 'safety', retryable: false, fallbackEligible: false, blockAccount: false, cooldownMs: 0,
+    }, error);
+  }
+});
+
+test('the caller media credit cap refuses input without fallback or an account cooldown', () => {
+  assert.deepEqual(classifyFailure('This job needs about 30 credits, over the 24-credit cap for one job (credit balance limit). Raise max_credits or split the job.'), {
+    kind: 'input', retryable: false, fallbackEligible: false, blockAccount: false, cooldownMs: 0,
+  });
+  assert.deepEqual(classifyFailure('Not enough credits: the job needs about 30 and the account has 20.'), {
+    kind: 'quota', retryable: true, fallbackEligible: true, blockAccount: true, cooldownMs: 900_000,
+  });
+});
