@@ -1,3 +1,4 @@
+import {jobDirectory,historyJobIds} from './job-history.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -115,18 +116,18 @@ export function selectInstalledSkills(task, skills, limit = 2, {blocked = [], ba
 function relatedJobs(routerRoot, cwd, currentId) {
   const root = path.join(routerRoot, 'jobs');
   let entries;
-  try { entries = fs.readdirSync(root, {withFileTypes: true}).filter(e => e.isDirectory() && /^[a-f0-9-]{36}$/.test(e.name)).map(e => ({id: e.name, time: fs.statSync(path.join(root, e.name)).mtimeMs})).sort((a, b) => b.time - a.time).slice(0, 200); } catch { return []; }
+  try { entries = historyJobIds(root).map(id => ({id, time: fs.statSync(jobDirectory(root, id)).mtimeMs})).sort((a, b) => b.time - a.time).slice(0, 200); } catch { return []; }
   const found = [];
   for (const e of entries) {
     if (e.id === currentId) continue;
-    const input = source(path.join(root, e.id, 'status.json'), root, 256000);
+    const input = source(path.join(jobDirectory(root, e.id), 'status.json'), root, 256000);
     if (!input || input.truncated) continue;
     try {
       const job = JSON.parse(input.content);
       if (!job.cwd || canonical(job.cwd) !== canonical(cwd) || job.parentId) continue;
       let attempt = null;
       if (/^[a-f0-9-]{36}$/.test(job.activeAttempt || '')) {
-        const saved = source(path.join(root, job.activeAttempt, 'status.json'), root, 256000);
+        const saved = source(path.join(jobDirectory(root, job.activeAttempt), 'status.json'), root, 256000);
         try { const candidate = saved && !saved.truncated ? JSON.parse(saved.content) : null;
           if (candidate?.parentId === job.id && candidate.cwd && canonical(candidate.cwd) === canonical(cwd)) attempt = candidate;
         } catch { /* Ignore a partial active-attempt record. */ }

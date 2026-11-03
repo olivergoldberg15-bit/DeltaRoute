@@ -1,3 +1,4 @@
+import path from 'node:path';import {jobDirectory} from './job-history.mjs';
 import {researchGate} from './browser.mjs';
 const number=(...values)=>{for(const v of values)if(typeof v==='number'&&Number.isFinite(v)&&v>=0)return v;return null;};
 export function classifyOutcome(job){const gate=job.provider==='perplexity'?researchGate({answer:job.answer||''}):job.provider==='grok'&&job.researchPacket?researchGate(job.researchPacket):null;const error=gate||job.researchError||job.error||'';if(/sign[ -]?in|sign[ -]?up|login|free allowance/i.test(error))return {state:job.provider==='grok'?'source_login_required':'login_required',availableNow:false,reason:error};if(/quota|rate.?limit/i.test(error))return {state:'quota_limited',availableNow:false,reason:error};return {state:job.status==='completed'?'last_run_succeeded':'last_run_'+job.status,availableNow:true,reason:error||null};}
@@ -22,8 +23,8 @@ export function compactJob(job,root,maxAnswer=6000){
  if(job.patch)result.patch={file:job.patch.file,paths:job.patch.paths?.slice(0,30),pathCount:job.patch.paths?.length||0,bytes:job.patch.bytes};if(job.renders)result.renders=job.renders.slice(-4);if(job.preReview)result.preReview=job.preReview;if(job.monitors)result.monitors=job.monitors.slice(-3);if(job.attention)result.attention=job.attention;if(job.helpers)result.helpers=job.helpers;
  if(job.files)result.files=job.files;if(job.credits)result.credits=job.credits;if(job.warning)result.warning=job.warning;if(job.recoveredFrom)result.recoveredFrom=job.recoveredFrom;if(job.outDir)result.outDir=job.outDir;
  if(job.attempts)result.attempts=job.attempts.map(a=>({taskId:a.taskId,provider:a.provider,status:a.status,error:a.error,failureKind:a.failure?.kind,worktree:a.worktree}));
- result.artifacts={status:root.replaceAll('\\','/')+'/jobs/'+job.id+'/status.json'};
- if(job.childPid||job.resultTaskId){const dir=root.replaceAll('\\','/')+'/jobs/'+(job.resultTaskId||job.id);result.artifacts.answer=dir+'/answer.txt';result.artifacts.rawOutput=dir+'/stdout.log';}
+ result.artifacts={status:path.join(jobDirectory(path.join(root,'jobs'),job.id),'status.json').replaceAll('\\','/')};
+ if(job.childPid||job.resultTaskId){const dir=jobDirectory(path.join(root,'jobs'),job.resultTaskId||job.id).replaceAll('\\','/');result.artifacts.answer=dir+'/answer.txt';result.artifacts.rawOutput=dir+'/stdout.log';}
  if(job.answer!==undefined){result.answer=String(job.answer).slice(0,maxAnswer);if(String(job.answer).length>maxAnswer)result.answerTruncated=true;}
  if(job.sources)result.sources=job.sources.slice(0,12);if(job.researchPacket)result.researchSources=job.researchPacket.sources?.slice(0,12)||[];if(job.researchError)result.researchError=job.researchError;
  return result;

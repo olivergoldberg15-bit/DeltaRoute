@@ -20,6 +20,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import {jobDirectory} from './job-history.mjs';
 import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -127,9 +128,9 @@ const refused=(id,text)=>({jsonrpc:'2.0',id,result:{isError:true,content:[{type:
 
 // Paths a task's output files may come from: its own out/ folder and those of the attempts that ran it.
 export function outputDirs(taskId,jobsDir=JOBS_DIR){
- if(!TASK_ID.test(String(taskId)))return [];let job;try{job=JSON.parse(fs.readFileSync(path.join(jobsDir,taskId,'status.json'),'utf8'));}catch{return [];}
+ if(!TASK_ID.test(String(taskId)))return [];let job;try{job=JSON.parse(fs.readFileSync(path.join(jobDirectory(jobsDir,taskId),'status.json'),'utf8'));}catch{return [];}
  const ids=new Set([taskId,job.resultTaskId,...(job.attempts||[]).map(a=>a.taskId)].filter(id=>TASK_ID.test(String(id))));
- return [...ids].map(id=>path.join(jobsDir,id,'out')).filter(d=>{try{return fs.statSync(d).isDirectory();}catch{return false;}});
+ return [...ids].map(id=>path.join(jobDirectory(jobsDir,id),'out')).filter(d=>{try{return fs.statSync(d).isDirectory();}catch{return false;}});
 }
 export function listOutputs(taskId,jobsDir=JOBS_DIR){
  const files=[];for(const dir of outputDirs(taskId,jobsDir))for(const e of fs.readdirSync(dir,{withFileTypes:true}))if(e.isFile()&&!files.some(f=>f.name===e.name))files.push({name:e.name,bytes:fs.statSync(path.join(dir,e.name)).size});

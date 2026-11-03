@@ -82,9 +82,10 @@ test('a workflow research attempt is not refused for .gstack/ files, so fallback
  assert.doesNotMatch(submitted.stderr,/clean Git checkout/);assert.match(submitted.stderr,/No enabled installed worker/);
  const baseRef=git(dir,'rev-parse','HEAD').trim();
  const attempt=()=>{const id=crypto.randomUUID();fs.mkdirSync(path.join(runtime,'jobs',id),{recursive:true});fs.writeFileSync(path.join(runtime,'jobs',id,'status.json'),JSON.stringify({id,parentId:crypto.randomUUID(),provider:'grok',category:'research',task:'Find the original source',cwd:dir,mode:'read-only',baseRef,workflowRef:{id:'w',stepId:'s'},invoked:false,status:'queued'}));spawnSync(process.execPath,['server.mjs','--attempt',id],{cwd:runtime,windowsHide:true,env:{...process.env,MODEL_ROUTER_WORKER:''}});return JSON.parse(fs.readFileSync(path.join(runtime,'jobs',id,'status.json'),'utf8'));};
- const reached=attempt();assert.equal(reached.status,'failed');assert.equal(reached.error,'gstack browser is not installed');assert.ok(reached.worktree);
+ const reached=attempt();assert.equal(reached.status,'failed');assert.equal(reached.error,'gstack browser is not installed');assert.equal(reached.worktree,null);
  fs.writeFileSync(path.join(dir,'unsaved.txt'),'x');
- assert.match(attempt().error,/clean Git checkout/);
+ // Browser research reads no checkout, so unrelated edits there no longer refuse it (owner, 2026-11-03).
+ assert.equal(attempt().error,'gstack browser is not installed');
 });
 
 test('smoke verdict only passes when the worker really wrote the file',()=>{
