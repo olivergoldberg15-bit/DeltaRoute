@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {jobDirectory} from './job-history.mjs';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -29,7 +30,7 @@ export async function executeHead(root,provider,{cwd,prompt,sessionId,logDir,tim
 export async function runSupervisor(root,id,{once=false,execute=executeHead,wait=sleep,readLimits=readCodexAccountLimits,emit=x=>process.stdout.write(JSON.stringify(x)+'\n'),maxPhases=64}={}){
  if(process.env.MODEL_ROUTER_WORKER==='1'||process.env.DELTAROUTE_MANAGED_HEAD==='1')throw Error('A worker/head cannot recursively launch a coordinator supervisor');
  const dir=path.join(root,'workflows',id),initial=readWorkflow(root,id),releaseWorkflow=acquireProcessLease(path.join(dir,'supervisor.lock'));let releaseProject;try{const key=crypto.createHash('sha256').update(path.resolve(initial.contract.cwd).toLowerCase()).digest('hex');releaseProject=acquireProcessLease(path.join(root,'coordinator-project-leases',key));}catch(e){releaseWorkflow();throw e;}const release=()=>{releaseProject();releaseWorkflow();};let phases=0,lastNotice='',nextStatusCheck=0;
- const readJob=jobId=>JSON.parse(fs.readFileSync(path.join(root,'jobs',jobId,'status.json'),'utf8'));
+ const readJob=jobId=>JSON.parse(fs.readFileSync(path.join(jobDirectory(path.join(root,'jobs'),jobId),'status.json'),'utf8'));
  const state=change=>mutateWorkflow(root,id,p=>{p.head={...(p.head||{}),...change,updatedAt:new Date().toISOString()};return p.head;});
  try{while(phases<maxPhases){let plan=readWorkflow(root,id);if(plan.head?.pid&&alive(plan.head.pid))throw Error('Previous head process termination is unconfirmed; no replacement launched');if(Object.values(plan.progress).every(s=>s.checkpoint)){state({status:'completed',pid:null});emit({workflowId:id,status:'completed'});return {status:'completed'};}
   const latest=Object.values(plan.progress).flatMap(s=>s.jobs.slice(-1)).map(j=>{try{return readJob(j);}catch{return {id:j,missing:true};}});

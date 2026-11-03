@@ -31,10 +31,11 @@ import {watchDeadline,writeWrapUp,deadlineBrief} from './deadline.mjs';
 import {exportPatch,applyPatch} from './patches.mjs';
 import {RENDER_DIR,renderRequest,renderStills,pendingRequests,findChrome,renderBrief} from './render-stills.mjs';
 import {preReviewArgs,parsePreReview} from './pre-review.mjs';
-import {boardFile,postMessage,readBoard,boardView,collectOutbox,mirrorBoard,boardBrief,NUDGE} from './board.mjs';
+import {boardFile,postMessage,readBoard,boardView,collectOutbox,mirrorBoard,boardBrief,NUDGE,reserveHelperSlot} from './board.mjs';
 import {progressSnapshot,ruleVerdict,monitorPrompt,parseVerdict,nudgeText,NEEDS_NUDGE} from './monitor.mjs';
 import {RUNTIME_DIR} from './deadline.mjs';
 import {resolveMedia,mediaJobSpec,grokImagine,previewArgs} from './media.mjs';
+import {jobDirectory,historyJobIds,archiveOldJobs,queueLock,archivedPaths} from './job-history.mjs';
 
 const COORDINATOR_ID=process.env.DELTAROUTE_COORDINATOR==='codex'?'codex':'claude';
 const COORDINATOR_LABEL=COORDINATOR_ID==='codex'?'Codex':'Claude Code';
@@ -44,17 +45,18 @@ const JOBS=path.join(ROOT,'jobs');
 fs.mkdirSync(JOBS,{recursive:true});
 const config=()=>{const c=JSON.parse(fs.readFileSync(path.join(ROOT,'config.json'),'utf8'));for(const w of Object.values(c.workers))if(w.script)w.script=path.resolve(ROOT,w.script);return c;};
 const write=(file,data)=>atomicWriteJSON(file,data,{beforeCommit:j=>fs.existsSync(path.join(path.dirname(file),'cancelled'))?{...j,status:'cancelled'}:j});
-const jobFile=id=>{if(!/^[a-f0-9-]{36}$/.test(id))throw Error('Invalid task ID');return path.join(JOBS,id,'status.json');};
-const readJob=id=>{const j=JSON.parse(fs.readFileSync(jobFile(id),'utf8'));return fs.existsSync(path.join(JOBS,id,'cancelled'))?{...j,status:'cancelled'}:j;};
+const jobFile=id=>{if(!/^[a-f0-9-]{36}$/.test(id))throw Error('Invalid task ID');return path.join(jobDirectory(JOBS,id),'status.json');};
+const readJob=id=>{const j=archivedPaths(JOBS,JSON.parse(fs.readFileSync(jobFile(id),'utf8')));return fs.existsSync(path.join(jobDirectory(JOBS,id),'cancelled'))?{...j,status:'cancelled'}:j;};
 // A miss reads contents and mtime through one open: on Windows a stat opens the file too, so a separate stat doubled the cold scan.
 const jobFactsCache=new Map();
-const jobFacts=id=>{const file=jobFile(id),cancelled=fs.existsSync(path.join(JOBS,id,'cancelled')),cached=jobFactsCache.get(id);if(cached&&!cancelled&&fs.statSync(file).mtimeMs===cached.mtimeMs)return cached.facts;const fd=fs.openSync(file,'r');let mtimeMs,raw;try{mtimeMs=fs.fstatSync(fd).mtimeMs;raw=fs.readFileSync(fd,'utf8');}finally{fs.closeSync(fd);}const j=JSON.parse(raw),facts={};if(cancelled)j.status='cancelled';for(const k of ['id','parentId','provider','status','isOrchestrator','workerPid','finishedAt','updatedAt','createdAt','error','invoked','collectionMethod','modelUsed','authentication'])facts[k]=j[k];facts.sourceValidation={recoveryReason:j.sourceValidation?.recoveryReason};facts.researchPacket={sourceValidation:{recoveryReason:j.researchPacket?.sourceValidation?.recoveryReason}};facts.health=classifyOutcome(j);if(['completed','failed','cancelled','timed_out','needs_coordinator'].includes(j.status))jobFactsCache.set(id,{mtimeMs,facts});else jobFactsCache.delete(id);return facts;};
+const jobFacts=id=>{const file=jobFile(id),cancelled=fs.existsSync(path.join(jobDirectory(JOBS,id),'cancelled')),cached=jobFactsCache.get(id);if(cached&&!cancelled&&fs.statSync(file).mtimeMs===cached.mtimeMs)return cached.facts;const fd=fs.openSync(file,'r');let mtimeMs,raw;try{mtimeMs=fs.fstatSync(fd).mtimeMs;raw=fs.readFileSync(fd,'utf8');}finally{fs.closeSync(fd);}const j=JSON.parse(raw),facts={};if(cancelled)j.status='cancelled';for(const k of ['id','parentId','provider','status','isOrchestrator','workerPid','finishedAt','updatedAt','createdAt','error','invoked','collectionMethod','modelUsed','authentication'])facts[k]=j[k];facts.sourceValidation={recoveryReason:j.sourceValidation?.recoveryReason};facts.researchPacket={sourceValidation:{recoveryReason:j.researchPacket?.sourceValidation?.recoveryReason}};facts.health=classifyOutcome(j);if(['completed','failed','cancelled','timed_out','needs_coordinator'].includes(j.status))jobFactsCache.set(id,{mtimeMs,facts});else jobFactsCache.delete(id);return facts;};
 const update=(id,data)=>{const prior=readJob(id),job={...prior,...data,updatedAt:new Date().toISOString()};if(fs.existsSync(path.join(JOBS,id,'cancelled')))job.status='cancelled';write(jobFile(id),job);if(job.workflowRef&&!job.parentId&&(job.status!==prior.status||job.phase!==prior.phase))streamJob(job);return job;};
 // Workflow jobs stream every status change to the event log and redraw the dashboard. Never fatal to the worker.
 function streamJob(job){try{appendEvent(ROOT,job.workflowRef.id,{type:'job',step:job.workflowRef.stepId,subagent:job.workflowRef.subagentId,taskId:job.id,provider:job.provider,status:job.status,phase:job.phase});refreshDashboard(job.workflowRef.id);}catch{}}
 function refreshDashboard(workflowId){try{return renderDashboard(ROOT,workflowId,readJob,{coordinatorLabel:COORDINATOR_LABEL});}catch{return null;}}
 const alive=pid=>{if(!pid)return false;try{process.kill(pid,0);return true;}catch(e){return e.code==='EPERM';}};
-const OWN_GROUP=process.platform!=='win32';
+// Detach on Windows too: taskkill /T needs provider descendants to survive until the tree is stopped.
+const OWN_GROUP=true;
 
 export function subscriptionEnv(source=process.env){
  const env={...source};
@@ -63,7 +65,7 @@ export function subscriptionEnv(source=process.env){
 }
 function available(){
  const cfg=config(),recent={},outcomes={},accounts={};
- for(const id of fs.readdirSync(JOBS).filter(n=>/^[a-f0-9-]{36}$/.test(n))){try{const j=jobFacts(id);if(j.isOrchestrator||['queued','running'].includes(j.status))continue;const at=j.finishedAt||j.updatedAt||j.createdAt||'',health=j.health,failure=classifyFailure(j.error||''),key=accountKey(j.provider);if(!outcomes[j.provider]||at>outcomes[j.provider].at)outcomes[j.provider]={...health,at};const sourceRecovery=j.sourceValidation?.recoveryReason||j.researchPacket?.sourceValidation?.recoveryReason;if(sourceRecovery){const sourceFailure=classifyFailure(sourceRecovery==='auth'?'authentication expired':sourceRecovery==='quota'?'quota exhausted':sourceRecovery==='challenge'?'browser challenge':sourceRecovery==='outage'?'provider outage':sourceRecovery);if(sourceFailure.blockAccount&&(!accounts.perplexity||at>accounts.perplexity.at))accounts.perplexity={at,status:'failed',failure:sourceFailure,error:'Source provider '+sourceRecovery};}if(!/^Fresh source collection failed/.test(j.error||'')&&(failure.blockAccount||j.status==='completed'&&j.invoked!==false&&!j.collectionMethod)&&(!accounts[key]||at>accounts[key].at))accounts[key]={at,status:j.status,failure,error:j.error};if(j.status==='completed'&&health.availableNow&&(!recent[j.provider]||at>recent[j.provider].completedAt))recent[j.provider]={taskId:j.id,completedAt:at,model:j.modelUsed||null,authentication:j.authentication||'Account-authenticated CLI; exact billing not independently verified'};}catch{}}
+ for(const id of historyJobIds(JOBS)){try{const j=jobFacts(id);if(j.isOrchestrator||['queued','running'].includes(j.status))continue;const at=j.finishedAt||j.updatedAt||j.createdAt||'',health=j.health,failure=classifyFailure(j.error||''),key=accountKey(j.provider);if(!outcomes[j.provider]||at>outcomes[j.provider].at)outcomes[j.provider]={...health,at};const sourceRecovery=j.sourceValidation?.recoveryReason||j.researchPacket?.sourceValidation?.recoveryReason;if(sourceRecovery){const sourceFailure=classifyFailure(sourceRecovery==='auth'?'authentication expired':sourceRecovery==='quota'?'quota exhausted':sourceRecovery==='challenge'?'browser challenge':sourceRecovery==='outage'?'provider outage':sourceRecovery);if(sourceFailure.blockAccount&&(!accounts.perplexity||at>accounts.perplexity.at))accounts.perplexity={at,status:'failed',failure:sourceFailure,error:'Source provider '+sourceRecovery};}if(!/^Fresh source collection failed/.test(j.error||'')&&(failure.blockAccount||j.status==='completed'&&j.invoked!==false&&!j.collectionMethod)&&(!accounts[key]||at>accounts[key].at))accounts[key]={at,status:j.status,failure,error:j.error};if(j.status==='completed'&&health.availableNow&&(!recent[j.provider]||at>recent[j.provider].completedAt))recent[j.provider]={taskId:j.id,completedAt:at,model:j.modelUsed||null,authentication:j.authentication||'Account-authenticated CLI; exact billing not independently verified'};}catch{}}
  return Object.entries(cfg.workers).map(([name,w])=>{const h=accounts[accountKey(name)],cooldown=h?.failure.blockAccount?failureCooldownMs(h.failure.kind,h.error,cfg.fallback?.cooldownMs):0;const retryAfter=h&&cooldown?new Date(Date.parse(h.at)+cooldown).toISOString():null;const cooling=h?.status!=='completed'&&retryAfter&&Date.parse(retryAfter)>Date.now();return {name,...w,installed:w.transport==='cursor'||['cursor','codex','gemini','higgsfield'].includes(name)?workerInstalled(w):['perplexity','grok','muse'].includes(name)?fs.existsSync(cfg.browser?.command||''):false,availableNow:!cooling,retryAfter:cooling?retryAfter:null,lastOutcome:cooling?{...outcomes[name],state:h.failure.kind+'_cooldown'}:outcomes[name]||null,lastSuccessfulExecution:recent[name]||null,authentication:'Bounded account cooldowns; a later task probes again after cooldown. Explicit fallback=false retries a preferred provider now.',model:w.model||'provider account default'};});
 }
 const compactRoles=roles=>Object.fromEntries(Object.entries(roles).map(([role,r])=>[role,r.pick?{id:r.pick.id,execution:r.pick.execution,fit:r.pick.fit}:null]));
@@ -94,15 +96,16 @@ async function attemptWorker(id){
   const start=Date.now();update(id,{slotAt:new Date(start).toISOString()});
   let job=readJob(id);if(job.status==='cancelled')return;
   let cwd=job.cwd,branch=null;
-  if(job.mode==='code'||job.workflowRef&&job.baseRef){
+  const isolated=job.category!=='video_analysis'&&!['perplexity','grok','muse'].includes(job.provider)&&(job.mode==='code'||job.workflowRef&&job.baseRef);
+  if(isolated){
    git(['rev-parse','--show-toplevel'],cwd);
-   if(dirtyEntries(cwd).length)throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode.');
+   if(job.mode==='code'&&dirtyEntries(cwd).length)throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode.');
    branch='codex/router-'+id.slice(0,8);cwd=path.join(JOBS,id,'worktree');git(['worktree','add','-b',branch,cwd,job.baseRef||'HEAD'],job.cwd);
    linkDependencies(job.cwd,cwd);
   }
   // Image jobs write into their own output folder: no Git checkout, nothing else to touch.
   if(job.category==='image'){cwd=path.join(JOBS,id,'out');fs.mkdirSync(cwd,{recursive:true});}
-  update(id,{status:'running',workerPid:process.pid,worktree:job.mode==='code'||job.workflowRef&&job.baseRef?cwd:null,outDir:job.category==='image'?cwd:null,branch,startedAt:new Date().toISOString()});
+  update(id,{status:'running',workerPid:process.pid,worktree:isolated?cwd:null,outDir:job.category==='image'?cwd:null,branch,startedAt:new Date().toISOString()});
   const env=subscriptionEnv();
   if(job.provider==='higgsfield'){
    update(id,{invoked:true,phase:'checking_higgsfield_account'});
@@ -210,11 +213,12 @@ function serviceBoard(id,job,cwd,team){
 // A help request becomes an ordinary read-only job at once; its answer is posted back to the board when it ends.
 function launchHelper(id,job,team,msg){
  const cfg=config(),prior=readJob(id).helpers||[],reply=t=>{try{postMessage(team.file,{kind:'chief',from:'deltaroute',to:msg.from,text:t},{worker:false});}catch{}};
- if(prior.length>=(cfg.board?.maxHelpersPerJob??4))return reply('Help limit reached for this job ('+prior.length+'). Do this piece yourself.');
+ // A slot is reserved before the submit starts, so a burst of requests cannot all pass the count before any helper is recorded.
+ const cap=cfg.board?.maxHelpersPerJob??4,slot=reserveHelperSlot(path.join(JOBS,id),{maxHelpers:cap,helpers:prior});if(!slot)return reply('Help limit reached for this job ('+cap+'). Do this piece yourself.');
  const provider=['perplexity','grok','muse','codex','gemini','cursor'].includes(msg.to)?msg.to:'auto';
  call('submit_task',{task:msg.text,cwd:job.cwd,category:msg.ask,mode:'read-only',provider,context:'Asked on the team board by '+msg.from+', who is working on: '+String(job.task).slice(0,800),board_reply:{workflowId:job.workflowRef?.id||null,jobId:job.workflowRef?null:job.parentId||id,to:msg.from,messageId:msg.id}})
-  .then(r=>{update(id,{helpers:[...(readJob(id).helpers||[]),{taskId:r.id,ask:msg.ask,to:r.provider||provider,messageId:msg.id}]});reply('Help request '+msg.id+' went to '+(r.provider||provider)+' (task '+r.id+'). The answer will appear here.');})
-  .catch(e=>reply('Could not start help for '+msg.id+': '+e.message.slice(0,300)));
+  .then(r=>{slot.commit(r.id);update(id,{helpers:[...(readJob(id).helpers||[]),{taskId:r.id,ask:msg.ask,to:r.provider||provider,messageId:msg.id}]});reply('Help request '+msg.id+' went to '+(r.provider||provider)+' (task '+r.id+'). The answer will appear here.');})
+  .catch(e=>{slot.release();reply('Could not start help for '+msg.id+': '+e.message.slice(0,300));});
 }
 // A disposable monitor: one snapshot, one fresh Grok chat (Gemini Flash if Grok is busy or signed out), one verdict.
 async function runMonitor(id,job,cwd,team,times,cfg,env){
@@ -249,13 +253,14 @@ async function worker(id){
   write(jobFile(childId),{id:childId,parentId:id,provider,model:provider===job.modelProvider?job.model:undefined,category:job.category,task:job.task,context:job.context,cwd:job.cwd,mode:job.mode,baseRef,limits:job.limits,workflowRef:job.workflowRef,mediaOptions:job.mediaOptions,researchScope:job.researchScope,researchPacket:packet,imageSpec:job.imageSpec,visual:job.visual,effort:job.effort,boardReply:job.boardReply,invoked:false,status:'queued',createdAt:new Date().toISOString()});
   const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'--attempt',childId],{windowsHide:true,detached:OWN_GROUP,stdio:'ignore',env:process.env});update(childId,{workerPid:child.pid});
   const seconds=(job.limits?.attemptTimeoutSeconds||cfg.fallback?.attemptTimeoutSeconds||cfg.timeoutSeconds)+30,expire=()=>{const active=readJob(childId);killTree(active.childPid);killTree(active.authPid);killTree(active.prepPid);killTree(child.pid);if(!['cancelled','timed_out'].includes(readJob(childId).status))update(childId,{status:'timed_out',error:'Worker exceeded time limit including queue/auth/browser phases',finishedAt:new Date().toISOString()});};
-  let deadline=watchDeadline({seconds,warnRatio:1,onExpire:()=>{const slotAt=readJob(childId).slotAt;if(!slotAt)return expire();deadline=watchDeadline({startedAt:Date.parse(slotAt),seconds,warnRatio:1,onExpire:expire});}});
+  // Re-arm from the slot time only after a real queue wait. Re-arming for a sub-second slot delay let the attempt's own login-probe timeout win, turning a hung login into an auth failure.
+  const spawnedAt=Date.now();let deadline=watchDeadline({seconds,warnRatio:1,onExpire:()=>{const slotAt=Date.parse(readJob(childId).slotAt||'');if(!(slotAt-spawnedAt>=5000))return expire();deadline=watchDeadline({startedAt:slotAt,seconds,warnRatio:1,onExpire:expire});}});
   if(cancelled()){deadline.stop();killTree(child.pid);update(childId,{status:'cancelled'});return {status:'cancelled',id:childId,invoked:false};}
   update(id,{phase:'attempt_'+(index+1)+'_'+provider,activeAttempt:childId,childPid:child.pid});
   try{await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve);});}finally{deadline.stop();}
   let r=readJob(childId);
   if(r.invoked&&(!r.tokenUsage||['cancelled','timed_out'].includes(r.status)))r=update(childId,{tokenUsage:snapshotUsage(r),finishedAt:r.finishedAt||new Date().toISOString()});if(['queued','running'].includes(r.status))r=update(childId,{status:cancelled()?'cancelled':'failed',error:'Worker process exited unexpectedly',finishedAt:new Date().toISOString()});
-  if(r.status!=='completed'){const pids=[r.childPid,r.authPid,r.prepPid].filter(Boolean);const until=Date.now()+1500;while(pids.some(alive)&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,100));if(pids.some(alive))return {...r,id:childId,status:'failed',error:'Previous attempt process could not be confirmed stopped. Wait for worker shutdown before modifying the task workspace.',handoffRequired:true,unsafeProcessAlive:true};
+  if(r.status!=='completed'){const stopped=await stopProcessTrees([r.childPid,r.authPid,r.prepPid]);r=update(childId,{terminationConfirmed:stopped});update(id,{terminationConfirmed:stopped});if(!stopped)return {...r,id:childId,status:'failed',error:'Previous attempt process could not be confirmed stopped. Wait for worker shutdown before modifying the task workspace.',handoffRequired:true,unsafeProcessAlive:true};
    // The process is stopped: look at what it actually left before calling it a failure.
    if(!cancelled()){const outputs=job.category==='image'?verifyOutputs(path.join(JOBS,childId,'out'),job.imageSpec):null;let changed=[];if(job.mode==='code'&&r.worktree){try{changed=changedPaths(r.worktree,baseRef||'HEAD');}catch{}if(changed.length&&!r.patch){try{r=update(childId,{patch:exportPatch(r.worktree,baseRef,path.join(JOBS,childId,'change.patch'))});}catch{}}}
     const salvage=salvageAttempt(r,{category:job.category,mode:job.mode,outputs,changed,failureKind:classifyFailure(r.error||r.status).kind});
@@ -288,14 +293,15 @@ function answerOnBoard(job,status,answer,error){
  if(!job.boardReply)return;try{postMessage(boardFile(ROOT,job.boardReply),{kind:'answer',from:(job.provider||'helper')+':helper',to:job.boardReply.to,text:String(status==='completed'?answer||'(empty answer)':'No answer ('+status+'): '+(error||'unknown')).slice(0,5800),taskId:job.id,status},{worker:false});}catch{}
 }
 function snapshotUsage(j){const read=n=>{try{return fs.readFileSync(path.join(JOBS,j.id,n),'utf8');}catch{return '';}};return parseWorkerUsage(j.provider,read('stdout.log'),read('stderr.log'));}
-function stopActiveAttempt(j,status='cancelled'){
- if(!j.activeAttempt)return;try{const active=readJob(j.activeAttempt);if(!['queued','running'].includes(active.status))return;fs.writeFileSync(path.join(JOBS,active.id,'cancelled'),'');const stopped=[active.childPid,active.authPid,active.prepPid,active.workerPid].filter(Boolean).map(killTree).every(Boolean);update(j.id,{terminationConfirmed:stopped});update(active.id,{status,terminationConfirmed:stopped,tokenUsage:active.invoked?snapshotUsage(active):active.tokenUsage,finishedAt:new Date().toISOString()});}catch{}
+async function stopActiveAttempt(j,status='cancelled'){
+ if(!j.activeAttempt)return;try{const active=readJob(j.activeAttempt),final=!['queued','running'].includes(active.status);if(!final)fs.writeFileSync(path.join(JOBS,active.id,'cancelled'),'');const stopped=await stopProcessTrees([active.childPid,active.authPid,active.prepPid,active.workerPid]);update(j.id,{terminationConfirmed:stopped});update(active.id,{status:final?active.status:status,terminationConfirmed:stopped,tokenUsage:active.invoked?snapshotUsage(active):active.tokenUsage,finishedAt:active.finishedAt||new Date().toISOString()});}catch{update(j.id,{terminationConfirmed:false});}
 }
+export async function stopProcessTrees(pids,{stop=killTree,isAlive=alive,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),timeoutMs=1500}={}){pids=[...new Set(pids.filter(Boolean))];for(const pid of pids)try{stop(pid);}catch{}const until=Date.now()+timeoutMs;while(pids.some(isAlive)&&Date.now()<until)await wait(100);return !pids.some(isAlive);}
 // Windows stops the whole tree with taskkill. On Linux and macOS worker processes start as their own process
 // group (OWN_GROUP), so signalling -pid also stops the programs they launched, which would otherwise keep running.
 export function killTree(pid,{platform=process.platform,kill=(p,s)=>process.kill(p,s),run=spawnSync,isAlive=alive}={}){
  if(!pid)return true;
- if(platform==='win32'){const r=run('taskkill',['/PID',String(pid),'/T','/F'],{windowsHide:true});if(r.status===0)return true;}
+ if(platform==='win32'){const r=run('taskkill',['/PID',String(pid),'/T','/F'],{windowsHide:true});if(r.status===0)return !isAlive(pid);}
  else{try{kill(-pid,'SIGKILL');}catch{}}
  try{kill(pid,'SIGKILL');}catch(e){if(e.code==='ESRCH')return true;}
  return !isAlive(pid);
@@ -311,6 +317,8 @@ function mediaResult(job){if(!['needs_coordinator','failed'].includes(job.status
 async function newsTick(force=false){try{return await serviceNews(ROOT,{registry:loadRegistry(ROOT),cfg:config(),submit:args=>call('submit_task',{...args,cwd:ROOT}),readJob,force});}catch(e){return force?{error:e.message}:null;}}
 function registryNews(){const changed=takeUnseenChanges(ROOT);return changed.length?{registryNews:{changed,note:'Auto-applied from cited benchmarks. Tell the user; undo one with model_registry action undo and its change_id.'}}:{};}
 async function call(name,a={}){
+ a??={};if(typeof a!=='object'||Array.isArray(a))throw Error('arguments must be an object');if(a.category!==undefined&&!categories.includes(a.category))throw Error('Invalid category');if(a.fallback!==undefined&&typeof a.fallback!=='boolean')throw Error('fallback must be a boolean');
+ if(['submit_task','list_workers'].includes(name))archiveOldJobs(ROOT);
  if(['list_workers','recommend_route'].includes(name)||name==='model_registry'&&(a.action||'roles')==='roles')await newsTick();
  if(name==='generate_media'){
   if(typeof a.prompt!=='string'||!a.prompt.trim()||a.prompt.length>4000)throw Error('prompt must be 1 to 4000 characters');
@@ -336,8 +344,9 @@ async function call(name,a={}){
   if(action==='create_workflow'){const cwd=path.resolve(a.cwd||process.cwd());if(!fs.statSync(cwd).isDirectory())throw Error('cwd must be an existing directory');const template=a.template?loadTemplate(ROOT,a.template):null,created=createWorkflow(ROOT,{task:a.task,cwd,workflow:template?applyTemplate(template,a.workflow||{}):a.workflow,coordinator:COORDINATOR_ID,approvedByUser:a.approved_by_user??null}),dashboard=refreshDashboard(created.id);const opened=config().dashboard?.autoOpen===true&&openDashboard(dashboard);return {...created,...(template?{template:{name:template.name,briefFormat:template.brief_format,reviewChecklist:template.review_checklist}}:{}),dashboard,dashboardOpened:opened,next:created.approval.status==='approved'?'Light plan approved by the user go-ahead; run steps now. Small changes: revise_plan with a one-line approval.':'Show the user this Operation Plan (routes, agents, budgets) and wait for their approval; then call approve_plan with their words.'};}
   if(['checkpoint','run_step','approve_plan','revise_plan','run_subagent','simulated_review','final_review'].includes(action)){const owner=readWorkflow(ROOT,a.workflow_id).head?.owner||readWorkflow(ROOT,a.workflow_id).coordinator;if(owner!==COORDINATOR_ID)throw Error('Workflow belongs to '+owner+' head; use managed handoff before changing coordinators');}
   if(action==='apply_patch'){let j=a.task_id?readJob(a.task_id):null;if(!j&&a.workflow_id&&a.step_id){const p=readWorkflow(ROOT,a.workflow_id).progress[a.step_id];if(!p?.jobs.length)throw Error('That step has no job yet');j=readJob(p.jobs.at(-1));}if(!j)throw Error('apply_patch needs task_id, or workflow_id and step_id');
-   if(['queued','running'].includes(j.status))throw Error('Wait for the job to stop before applying its patch');
+   if(['queued','running'].includes(j.status)||j.terminationConfirmed===false)throw Error('Wait for the job to stop before applying its patch');
    const attempt=[j.resultTaskId,...(j.attempts||[]).map(x=>x.taskId).reverse()].filter(Boolean).map(x=>{try{return readJob(x);}catch{return null;}}).find(x=>x?.patch||x?.worktree)||j;
+   if(attempt.terminationConfirmed===false)throw Error('Wait for the job to stop before applying its patch');
    // Re-export while the worktree exists, so edits the coordinator made there are included.
    let patch=attempt.patch;if(attempt.worktree&&fs.existsSync(attempt.worktree)&&j.baseRef){patch=exportPatch(attempt.worktree,j.baseRef,path.join(JOBS,attempt.id,'change.patch'));update(attempt.id,{patch});}
    if(!patch)throw Error('This job left no patch (not a code job, or its worktree is gone)');
@@ -363,11 +372,12 @@ async function call(name,a={}){
   // Image jobs make files in their own output folder, so they never need a clean Git checkout.
   if(a.images&&a.category!=='image')throw Error('Invalid request: images requires the image category');
   const spec=a.category==='image'?imageSpec(a.images,{cwd}):undefined;
-  const mode=spec?'artifacts':a.mode||'read-only';if(!['read-only','code','artifacts'].includes(mode))throw Error('Invalid mode');
+  const mode=spec?'artifacts':a.mode||'read-only';if(!['read-only','code','artifacts'].includes(mode)||mode==='artifacts'&&!spec)throw Error('Invalid mode');
   if(spec&&a.provider&&!['auto','higgsfield','codex','grok'].includes(a.provider))throw Error('Invalid request: image jobs run on higgsfield, codex or grok');if(spec?.kind==='video'&&a.provider&&a.provider!=='higgsfield'&&a.provider!=='auto')throw Error('Invalid request: video runs on higgsfield');
-  if(mode==='code'||binding&&a.baseRef){git(['rev-parse','--show-toplevel'],cwd);if(dirtyEntries(cwd).length)throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode. Nothing was launched and no step try was used.');}
+  if(mode==='code'){git(['rev-parse','--show-toplevel'],cwd);if(dirtyEntries(cwd).length)throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode. Nothing was launched and no step try was used.');}
   const category=a.category||((videoURL(a.task)&&/watch|view|analy[sz]e|summari[sz]e|break.?down/i.test(a.task))?'video_analysis':'implementation'),provider=a.provider==='auto'||!a.provider?rankCandidates(ROOT,{category,candidates:candidateProviders({category,mode,workers:available()}),workers:available()}).providers[0]||null:a.provider;
   if((!a.provider||a.provider==='auto')&&!a.board_reply&&!binding&&!WORKER_ONLY.includes(category)){const r=route(category);if(r.provider===COORDINATOR_ID)throw Error('Claude keeps this kind of work: '+r.reason+' Do it here, or name a provider to delegate anyway.');}
+  if(binding&&(['perplexity','grok','muse'].includes(provider)||category==='video_analysis'))a.baseRef=undefined;
   const requestedScope=category==='social_research'||a.research_scope?researchScope(a.research_scope||{},category==='social_research'?a.task:''):undefined;
   if(provider==='claude')throw Error('Handle this category directly in the Claude coordinator; external delegation is unnecessary unless explicitly requested.');
   if(provider&&!available().some(w=>w.name===provider&&w.enabled&&w.installed))throw Error('No enabled installed worker for this provider');
@@ -376,17 +386,18 @@ async function call(name,a={}){
   if((['perplexity','grok','muse'].includes(provider)&&category!=='image'||category==='video_analysis')&&mode!=='read-only')throw Error('Research browser workers only support read-only mode');
   if(a.effort!==undefined&&!['low','medium','high'].includes(a.effort))throw Error('effort must be low, medium or high');const limits=a.profile&&a.profile!=='standard'?workloadProfile(a.profile):undefined;const selectedMedia=a.media_options?mediaOptions(a.media_options):undefined;
   if(selectedMedia&&category!=='video_analysis')throw Error('Media options require video_analysis category');
-  const active=fs.readdirSync(JOBS).filter(n=>/^[a-f0-9-]{36}$/.test(n)).map(n=>{try{return jobFacts(n);}catch{return null;}}).filter(j=>j&&!j.parentId&&['queued','running'].includes(j.status)&&alive(j.workerPid));
-  if(active.length>=20)throw Error('Queue full; wait for existing tasks');
   const boardReply=a.board_reply?{workflowId:a.board_reply.workflowId||null,jobId:a.board_reply.jobId||null,to:String(a.board_reply.to||'all').slice(0,80),messageId:String(a.board_reply.messageId||'').slice(0,16)}:undefined;if(boardReply)boardFile(ROOT,boardReply);
-  const id=crypto.randomUUID();fs.mkdirSync(path.join(JOBS,id));
+  const release=await queueLock(JOBS),id=crypto.randomUUID();try{
+  const active=fs.readdirSync(JOBS).filter(n=>/^[a-f0-9-]{36}$/.test(n)).map(n=>{try{return jobFacts(n);}catch{return null;}}).filter(j=>j&&!j.parentId&&['queued','running'].includes(j.status)&&(!j.workerPid&&j.status==='queued'||alive(j.workerPid)));
+  if(active.length>=20)throw Error('Queue full; wait for existing tasks');fs.mkdirSync(path.join(JOBS,id));
   write(jobFile(id),{id,provider,model:a.model,modelProvider:a.model?provider:undefined,requestedProvider:a.provider||'auto',fallback:a.fallback!==false,isOrchestrator:true,workflowRef:binding,baseRef:binding?a.baseRef:undefined,limits,visual:a.profile==='animation'||['frontend','creative'].includes(category)||(binding?isVisual(readWorkflow(ROOT,binding.id)):false)||undefined,effort:a.effort,boardReply,mediaOptions:selectedMedia,category,task:a.task,context:a.context||'',researchScope:requestedScope,imageSpec:spec,cwd,mode,status:'queued',createdAt:new Date().toISOString()});
+  }finally{release();}
   if(binding){try{if(binding.subagentId)reserveSubagent(ROOT,binding.id,binding.stepId,binding.subagentId,id,readJob);else reserveStep(ROOT,binding.id,binding.stepId,id,readJob);}catch(e){update(id,{status:'failed',error:e.message,finishedAt:new Date().toISOString()});throw e;}}
   const p=spawn(process.execPath,[fileURLToPath(import.meta.url),'--worker',id],{detached:true,windowsHide:true,stdio:'ignore',env:process.env});p.unref();update(id,{workerPid:p.pid});let result=readJob(id);const until=Date.now()+boundedWait(a.wait_seconds)*1000;while(['queued','running'].includes(result.status)&&Date.now()<until){await new Promise(r=>setTimeout(r,500));result=readJob(id);}return response(result);
  }
  if(name==='get_task'&&a.task_id&&!a.workflow_id){const raw=await call('get_task_raw',a),r=raw.category==='image'?mediaResult(raw):raw;const shown=r.category==='image'?previews({...r,id:a.task_id}):[];return shown.length?{...r,_images:shown}:r;}
- if(name==='get_task'||name==='get_task_raw'){if(a.workflow_id){const plan=readWorkflow(ROOT,a.workflow_id);const dashboard=refreshDashboard(a.workflow_id);const board=readBoard(boardFile(ROOT,{workflowId:plan.id}),{limit:8}).map(({id,at,files,...m})=>({...m,text:m.text.slice(0,300)})),chief=coordinatorUsage({since:plan.createdAt,mention:plan.id}),chiefTokens={freshTokens:chief.available?chief.freshTokens:null,cacheReadTokens:chief.available?chief.cacheReadTokens:null,replies:chief.replies,source:'Claude Code transcripts that mention this workflow'};return a.detail==='full'?{...plan,...workflowSummary(ROOT,plan,readJob),chiefTokens,board,dashboard}:{...workflowSummary(ROOT,plan,readJob),chiefTokens,board,dashboard};}let j=readJob(a.task_id);const until=Date.now()+boundedWait(a.wait_seconds)*1000;while(['queued','running'].includes(j.status)&&Date.now()<until){await new Promise(r=>setTimeout(r,500));j=readJob(a.task_id);}if(['queued','running'].includes(j.status)&&!alive(j.workerPid)){stopActiveAttempt(j);j=readJob(j.id);const stopped=j.terminationConfirmed!==false;j=update(j.id,{status:'needs_coordinator',handoff:{action:stopped?HANDOFF_ACTION:'wait_for_worker_shutdown',taskArtifact:jobFile(j.id)},error:stopped?'Worker process exited unexpectedly. Active child stopped; continue in the current coordinator using saved task and attempt artifacts.':'Worker process exited unexpectedly; child termination is unconfirmed. Wait for verified worker shutdown before editing its workspace.'});}return response(j);}
- if(name==='cancel_task'){const j=readJob(a.task_id);if(!['queued','running'].includes(j.status))return response(j);fs.writeFileSync(path.join(JOBS,j.id,'cancelled'),'');update(j.id,{status:'cancelled'});stopActiveAttempt(j);killTree(j.childPid);killTree(j.workerPid);return response(readJob(j.id));}
+ if(name==='get_task'||name==='get_task_raw'){if(a.workflow_id){const plan=readWorkflow(ROOT,a.workflow_id);const dashboard=refreshDashboard(a.workflow_id);const board=readBoard(boardFile(ROOT,{workflowId:plan.id}),{limit:8}).map(({id,at,files,...m})=>({...m,text:m.text.slice(0,300)})),chief=coordinatorUsage({since:plan.createdAt,mention:plan.id}),chiefTokens={freshTokens:chief.available?chief.freshTokens:null,cacheReadTokens:chief.available?chief.cacheReadTokens:null,replies:chief.replies,source:'Claude Code transcripts that mention this workflow'};return a.detail==='full'?{...plan,...workflowSummary(ROOT,plan,readJob),chiefTokens,board,dashboard}:{...workflowSummary(ROOT,plan,readJob),chiefTokens,board,dashboard};}let j=readJob(a.task_id);const until=Date.now()+boundedWait(a.wait_seconds)*1000;while(['queued','running'].includes(j.status)&&Date.now()<until){await new Promise(r=>setTimeout(r,500));j=readJob(a.task_id);}if(['queued','running'].includes(j.status)&&!alive(j.workerPid)){await stopActiveAttempt(j);j=readJob(j.id);const stopped=j.terminationConfirmed!==false;j=update(j.id,{status:'needs_coordinator',handoff:{action:stopped?HANDOFF_ACTION:'wait_for_worker_shutdown',taskArtifact:jobFile(j.id)},error:stopped?'Worker process exited unexpectedly. Active child stopped; continue in the current coordinator using saved task and attempt artifacts.':'Worker process exited unexpectedly; child termination is unconfirmed. Wait for verified worker shutdown before editing its workspace.'});}return response(j);}
+ if(name==='cancel_task'){const j=readJob(a.task_id);if(!['queued','running'].includes(j.status))return response(j);fs.writeFileSync(path.join(JOBS,j.id,'cancelled'),'');update(j.id,{status:'cancelled'});await stopActiveAttempt(j);killTree(j.childPid);killTree(j.workerPid);return response(readJob(j.id));}
  throw Error('Unknown tool');
 }
 const categories=['image','video_analysis','implementation','quick_coding','iteration','debugging','tests','review','research','social_research','large_context','planning','creative','frontend','simple','summarization'];
@@ -415,7 +426,7 @@ export async function handleMessage(msg,{allow=null}={}){
 }
 async function serve(){
  const lines=readline.createInterface({input:process.stdin,crlfDelay:Infinity}),pending=new Set();
- for await(const line of lines){let msg;try{msg=JSON.parse(line);}catch{continue;}const task=handleMessage(msg).then(reply=>{if(reply)process.stdout.write(JSON.stringify(reply)+'\n');}).catch(e=>{if(msg?.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:msg.id,error:{code:-32603,message:e.message}})+'\n');}).finally(()=>pending.delete(task));pending.add(task);}
+ for await(const line of lines){let msg;try{msg=JSON.parse(line);}catch{process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:null,error:{code:-32700,message:'Parse error'}})+'\n');continue;}const task=handleMessage(msg).then(reply=>{if(reply)process.stdout.write(JSON.stringify(reply)+'\n');}).catch(e=>{if(msg?.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:msg.id,error:{code:-32603,message:e.message}})+'\n');}).finally(()=>pending.delete(task));pending.add(task);}
  await Promise.allSettled(pending);
 }
 if(process.argv[2]==='--attempt')await attemptWorker(process.argv[3]);

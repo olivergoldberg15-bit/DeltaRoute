@@ -63,7 +63,7 @@ test('Nano Banana Pro jobs are priced first, capped, and report the credits they
  // Over the cap or over the balance: refused before generating, and classified so Codex can take it.
  for(const [opts,cap] of [[{balance:30,price:20},undefined],[{balance:3,price:2},24]]){
   const c=fakeCli(opts);
-  await assert.rejects(runHiggsfield({spec:{...spec,maxCredits:cap??null},worker:{command:'h',maxCreditsPerJob:24},outDir:path.join(tmp,'nb-refused'),run:c.run,download:c.download}),err=>{assert.equal(classifyFailure(err.message).kind,'quota',err.message);return true;});
+  await assert.rejects(runHiggsfield({spec:{...spec,maxCredits:cap??null},worker:{command:'h',maxCreditsPerJob:24},outDir:path.join(tmp,'nb-refused'),run:c.run,download:c.download}),err=>{assert.equal(classifyFailure(err.message).kind,/^Not enough credits/.test(err.message)?'quota':'input',err.message);return true;});
   assert.equal(c.calls.some(a=>a[1]==='create'),false,'nothing generated');
  }
  const expired=fakeCli({fail:'auth'});

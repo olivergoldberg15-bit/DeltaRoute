@@ -115,3 +115,86 @@ test('the retrying client retries forwarding faults, never resubmits a task, and
  f=scripted([reply(404,false),reply(404,false)]);await assert.rejects(remote.remoteRequest('https://x',{...opts(f),retries:1}),/forwarding layer/);
  f=scripted([reply(400,true,{error:'bad'})]);await assert.rejects(remote.remoteCall('https://x','get_task',{},opts(f)),/HTTP 400/);assert.equal(f.count(),1);
 });
+
+// Remote hardening regressions; these exercise HTTP dispatch without opening a socket or calling a provider.
+const {Readable}=await import('node:stream');
+const os=(await import('node:os')).default;
+function requestWithoutSocket(server,{body,key=museKey,headers={},chunks}={}){
+ return new Promise((resolve,reject)=>{
+  const req=Readable.from(chunks||[Buffer.from(JSON.stringify(body))]);req.method='POST';req.url='/mcp';req.headers={authorization:'Bearer '+key,...headers};
+  let text='';const res={headersSent:false,writeHead(status,headers){this.headersSent=true;this.status=status;this.headers=headers;},write(s){text+=s;},end(s){text+=s||'';resolve({status:this.status,headers:this.headers,body:text?JSON.parse(text):null});}};
+  req.on('error',reject);server.emit('request',req,res);
+ });
+}
+
+test('tool calls queue per server while auth and body-size rejections bypass the queue',async()=>{
+ let calls=0,release;const gate=new Promise(r=>release=r);
+ const isolated=remote.createRemoteServer({clientsFile,log:()=>{},handle:async msg=>{calls++;await gate;return {jsonrpc:'2.0',id:msg.id,result:{}};}});
+ const body={jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'list_workers',arguments:{}}};
+ const first=requestWithoutSocket(isolated,{body}),second=requestWithoutSocket(isolated,{body});
+ try{
+  assert.equal(calls,0,'dispatch must yield before entering synchronous tool work');
+  assert.equal((await requestWithoutSocket(isolated,{body,key:'wrong'})).status,401);
+  assert.equal((await requestWithoutSocket(isolated,{body,headers:{'content-length':String(1024*1024+1)}})).status,413);
+  assert.equal((await requestWithoutSocket(isolated,{body,chunks:[Buffer.alloc(1024*1024),Buffer.alloc(1)]})).status,413);
+  await new Promise(r=>setTimeout(r,20));assert.equal(calls,1,'only one tool may be in flight');
+  assert.equal((await requestWithoutSocket(isolated,{body,key:'wrong'})).status,401);
+ }finally{release();await Promise.all([first,second]);}
+ assert.equal(calls,2);
+});
+
+test('the tool queue yields between synchronous calls and recovers after a failed call',async()=>{
+ const run=remote.toolQueue(),order=[];
+ const first=run(()=>{order.push('first');setTimeout(()=>order.push('io'),0);throw Error('failed');});
+ const failed=assert.rejects(first,/failed/),second=run(()=>order.push('second'));
+ assert.deepEqual(order,[]);await Promise.all([failed,second]);assert.deepEqual(order,['first','io','second']);
+});
+
+test('a 540-request burst rejects bad keys and oversized bodies without waiting for tool completion',async()=>{
+ let calls=0,release;const gate=new Promise(r=>release=r);
+ const isolated=remote.createRemoteServer({clientsFile,log:()=>{},handle:async msg=>{calls++;await gate;return {jsonrpc:'2.0',id:msg.id,result:{}};}});
+ const body={jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'list_workers',arguments:{}}},tools=[],rejected=[];
+ for(let i=0;i<180;i++){
+  tools.push(requestWithoutSocket(isolated,{body}));
+  rejected.push(requestWithoutSocket(isolated,{body,key:'wrong'}),requestWithoutSocket(isolated,{body,headers:{'content-length':String(1024*1024+1)}}));
+ }
+ try{
+  const replies=await Promise.all(rejected);assert.equal(replies.filter(r=>r.status===401).length,180);assert.equal(replies.filter(r=>r.status===413).length,180);
+  assert.equal(calls,0,'all immediate rejections finish before queued work starts');
+ }finally{release();await Promise.all(tools);}
+ assert.equal(calls,180);
+});
+
+test('limited paths require a real repository below home, including delivery and junction targets',t=>{
+ const base=path.join(runtime,'path-policy'),home=path.join(base,'home'),repo=path.join(home,'repo'),child=path.join(repo,'sub'),outside=path.join(base,'outside');
+ fs.mkdirSync(path.join(repo,'.git'),{recursive:true});fs.mkdirSync(child);fs.mkdirSync(path.join(home,'plain'));fs.mkdirSync(path.join(outside,'.git'),{recursive:true});
+ fs.mkdirSync(path.join(home,'worktree'));fs.writeFileSync(path.join(home,'worktree','.git'),'gitdir: elsewhere');
+ t.mock.method(os,'homedir',()=>home);
+ assert.equal(remote.homeRepository(child),true);assert.equal(remote.homeRepository(path.join(home,'worktree')),true);
+ for(const dir of [home,outside,path.join(home,'plain'),path.join(repo,'missing'),path.join(repo,'.git','..','..'),null,''])assert.equal(remote.homeRepository(dir),false,String(dir));
+ fs.symlinkSync(outside,path.join(repo,'escape'),'junction');assert.equal(remote.homeRepository(path.join(repo,'escape')),false);
+ const limited={allowCode:true},call=args=>({method:'tools/call',params:{name:'submit_task',arguments:args}});
+ assert.equal(remote.refusal(call({cwd:child,mode:'code'}),limited),null);
+ for(const args of [{cwd:home},{cwd:outside},{cwd:null},{cwd:repo,deliver_to:home},{cwd:repo,images:{deliver_to:outside}}])assert.match(remote.refusal(call(args),limited),/cwd|deliver_to/);
+ assert.equal(remote.refusal(call({cwd:outside,deliver_to:home,allowed_paths:['.github/workflows']}),{full:true}),null);
+ assert.match(remote.refusal({method:'tools/call',params:{name:'generate_media',arguments:{cwd:repo,deliver_to:outside}}},limited),/deliver_to/);
+ fs.mkdirSync(path.join(home,'.git'));assert.equal(remote.homeRepository(path.join(home,'plain')),false,'home itself cannot be the repository root');
+});
+
+test('allowed_paths rejects cross-platform absolute paths, traversal and case variants of .github',()=>{
+ for(const p of ['/tmp/a','C:\\work\\a','C:/work/a','C:work','\\\\host\\share','../a','src/../a','src\\..\\a','src/file..txt','.github/workflows','.GiTHuB\\workflows','./.GITHUB/workflows'])assert.equal(remote.safeAllowedPaths({workflow:{steps:[{allowed_paths:[p]}]}}),false,p);
+ assert.equal(remote.safeAllowedPaths({allowed_paths:['src/**','README.md']}),true);
+ assert.equal(remote.safeAllowedPaths({allowed_paths:null}),false);
+});
+
+test('null tool arguments return JSON-RPC invalid params, and remote errors hide local paths',async()=>{
+ let calls=0;const isolated=remote.createRemoteServer({clientsFile,log:()=>{},handle:async msg=>{calls++;return {jsonrpc:'2.0',id:msg.id,result:{isError:true,content:[{type:'text',text:"ENOENT: open 'C:\\Users\\olive\\Private Folder\\secret.txt' and /home/olive/secret.txt"}]}};}});
+ const result=await requestWithoutSocket(isolated,{body:{jsonrpc:'2.0',id:8,method:'tools/call',params:{name:'submit_task',arguments:null}}});
+ assert.equal(result.status,200);assert.equal(result.body.id,8);assert.equal(result.body.error.code,-32602);assert.equal(calls,0);
+ const failed=await requestWithoutSocket(isolated,{body:{jsonrpc:'2.0',id:9,method:'tools/call',params:{name:'list_workers',arguments:{}}}});
+ assert.doesNotMatch(failed.body.result.content[0].text,/olive|secret|C:|\/home/);assert.match(failed.body.result.content[0].text,/ENOENT/);
+ const rpcError=remote.redactRemoteErrors({error:{code:-32603,message:'Failed at C:/Users/olive/file',data:{file:'\\\\server\\share\\secret'}}});
+ assert.doesNotMatch(JSON.stringify(rpcError),/Users|olive|server|share|secret/);
+ assert.equal(remote.redactRemoteErrors({error:{message:'Refused .github/ and src/file.txt'}}).error.message,'Refused .github/ and src/file.txt');
+ const success={result:{content:[{type:'text',text:'C:/allowed/output.png'}]}};assert.equal(remote.redactRemoteErrors(success),success);
+});
