@@ -83,7 +83,7 @@ const weighted = (scores, weights) => Object.entries(weights).reduce((sum, [c, w
 function availability(m, {coordinator, workers, live}) {
   if (m.provider === coordinator) return {available: true, execution: 'host'};
   if (m.provider === 'claude-native') return coordinator === 'claude' ? {available: true, execution: 'host_subagent'} : {available: false, reason: 'native subagent needs the Claude host'};
-  if (m.provider === 'claude') return {available: false, reason: 'Claude is not the host; no Claude worker transport'};
+  if (m.provider === 'claude') return coordinator === 'muse' ? {available: true, execution: 'coordinator'} : {available: false, reason: 'Claude is not the host; no Claude worker transport'};
   const w = workers.find(x => x.name === m.provider);
   if (!w?.enabled || w.installed === false) return {available: false, reason: m.provider + ' worker not enabled or installed'};
   if (w.availableNow === false) return {available: false, reason: m.provider + ' cooling down'};
@@ -111,7 +111,7 @@ export function assignRoles(registry, options = {}) {
   return Object.fromEntries(Object.keys(ROLES).map(role => [role, assignRole(registry, role, options)]));
 }
 
-// Claude first: the host keeps the work unless a worker is clearly better at this kind of work (Oliver, 2026-11-01).
+// Head first: the head keeps the work unless a worker is clearly better at this kind of work (was Claude first, Oliver, 2026-11-01; head is Muse from 2026-11-04 when coordinator='muse').
 export const CAPABILITY_FOR = {implementation: 'coding', quick_coding: 'coding', iteration: 'coding', debugging: 'coding', tests: 'coding', frontend: 'visual', creative: 'visual', review: 'review', planning: 'planning', simple: 'planning', large_context: 'large_context', summarization: 'large_context'};
 
 /** keep=true when the host's score for this category is within `margin` of the best available worker's. */
