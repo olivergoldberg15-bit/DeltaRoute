@@ -15,9 +15,15 @@ Results return the same way: worker → Claude Code → Muse → user.
 
 Plans and owner approvals flow through Muse for Oliver’s tap. Code edits still go through GitHub with Oliver’s per-write approval. Code-mode jobs that return `needs_coordinator` hand back to the coordinator conversation; they do not edit remotely on their own.
 
-## Limits — honest, unchanged by this role change
+## Head-first routing code — fixed 2026-11-04
 
-- This file defines roles and reporting. It does not by itself change the registry’s Claude-first routing code in `registry.mjs` / `server.mjs`. Changing default routing code is a separate code change, to be reviewed before merging.
+- `registry.mjs`: head-first rule, not Claude-first. When coordinator is `muse`, the head model is `muse-head` in `models.json`, and Claude is available as coordinator, not as the keeper.
+- `server.mjs`: `DELTAROUTE_HEAD=muse` makes route() return head execution for kept work, and submit_task says “Muse keeps this kind of work” instead of “Claude keeps this kind of work”.
+- Default (no `DELTAROUTE_HEAD` set) still behaves as before, with Claude as coordinator/head, so existing Claude-host jobs are unchanged.
+- Verified: all 371 tests pass on the changed code before pushing.
+
+## Limits — still true
+
 - Muse’s own work, and chats Oliver opens directly in the Claude app, bypass this hub by design.
 - Concurrency is 2 jobs. Workers run on subscription logins; quotas still apply.
-- Current hosting is the GitHub Codespace (see CLOUD.md for the optional cloud route). An always-on local PC is a later plan, to be connected by Oliver himself; until then the codespace may need waking and port 8787 set back to Public on restart.
+- Current hosting is the GitHub Codespace. An always-on local PC is a later plan, to be connected by Oliver himself; until then the codespace may need waking and port 8787 set back to Public on restart.
