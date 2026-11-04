@@ -38,6 +38,7 @@ import {resolveMedia,mediaJobSpec,grokImagine,previewArgs} from './media.mjs';
 import {jobDirectory,historyJobIds,archiveOldJobs,queueLock,archivedPaths} from './job-history.mjs';
 
 const COORDINATOR_ID=process.env.DELTAROUTE_COORDINATOR==='codex'?'codex':'claude';
+const HEAD_ID=process.env.DELTAROUTE_HEAD==='muse'?'muse':COORDINATOR_ID;
 const COORDINATOR_LABEL=COORDINATOR_ID==='codex'?'Codex':'Claude Code';
 const HANDOFF_ACTION='continue_in_current_'+COORDINATOR_ID+'_conversation';
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
@@ -71,7 +72,7 @@ function available(){
 const compactRoles=roles=>Object.fromEntries(Object.entries(roles).map(([role,r])=>[role,r.pick?{id:r.pick.id,execution:r.pick.execution,fit:r.pick.fit}:null]));
 const WORKER_ONLY=['image','research','social_research','video_analysis'];
 export function route(category='implementation',workers=available()){
- let verdict=null;if(!WORKER_ONLY.includes(category)){verdict=delegationVerdict(loadRegistry(ROOT),{category,coordinator:COORDINATOR_ID,workers,margin:config().delegation?.margin??5});if(verdict.keep)return {provider:COORDINATOR_ID,execution:'coordinator',category,alternatives:[],capability:verdict.capability,reason:verdict.reason};}
+ let verdict=null;if(!WORKER_ONLY.includes(category)){verdict=delegationVerdict(loadRegistry(ROOT),{category,coordinator:HEAD_ID,workers,margin:config().delegation?.margin??5});if(verdict.keep)return HEAD_ID==='muse'?{provider:'muse',execution:'head',category,alternatives:[],capability:verdict.capability,reason:verdict.reason}:{provider:COORDINATOR_ID,execution:'coordinator',category,alternatives:[],capability:verdict.capability,reason:verdict.reason};}
  if(['simple','planning','creative'].includes(category))return {provider:COORDINATOR_ID,execution:'coordinator',category,alternatives:[],reason:'Keep small self-contained tasks, planning and creative control in the current coordinator. External delegation adds startup/context overhead; request a separate review only when useful.'};
  const learned=rankCandidates(ROOT,{category,candidates:candidateProviders({category,mode:category==='image'?'artifacts':'read-only',workers}),workers}),eligible=verdict?.provider&&learned.providers.includes(verdict.provider)?[verdict.provider,...learned.providers.filter(p=>p!==verdict.provider)]:learned.providers;
  const reason=verdict&&!verdict.keep?verdict.reason:category==='image'?'Image jobs run on Nano Banana Pro through your Higgsfield login (priced and capped before generating, reported in credits), with Codex\'s built-in image tool as the no-credit backup. Pass images.outputs; files land in an output folder, no Git checkout needed.':'Configurable task-fit heuristic, not a measured model ranking. The coordinator should adjust for task requirements, explicit user choices, observed results, and availability.';
@@ -376,7 +377,7 @@ async function call(name,a={}){
   if(spec&&a.provider&&!['auto','higgsfield','codex','grok'].includes(a.provider))throw Error('Invalid request: image jobs run on higgsfield, codex or grok');if(spec?.kind==='video'&&a.provider&&a.provider!=='higgsfield'&&a.provider!=='auto')throw Error('Invalid request: video runs on higgsfield');
   if(mode==='code'){git(['rev-parse','--show-toplevel'],cwd);if(dirtyEntries(cwd).length)throw Error('Code delegation requires a clean Git checkout. Commit or stash changes first, or use read-only mode. Nothing was launched and no step try was used.');}
   const category=a.category||((videoURL(a.task)&&/watch|view|analy[sz]e|summari[sz]e|break.?down/i.test(a.task))?'video_analysis':'implementation'),provider=a.provider==='auto'||!a.provider?rankCandidates(ROOT,{category,candidates:candidateProviders({category,mode,workers:available()}),workers:available()}).providers[0]||null:a.provider;
-  if((!a.provider||a.provider==='auto')&&!a.board_reply&&!binding&&!WORKER_ONLY.includes(category)){const r=route(category);if(r.provider===COORDINATOR_ID)throw Error('Claude keeps this kind of work: '+r.reason+' Do it here, or name a provider to delegate anyway.');}
+  if((!a.provider||a.provider==='auto')&&!a.board_reply&&!binding&&!WORKER_ONLY.includes(category)){const r=route(category);if(r.provider==='muse')throw Error('Muse keeps this kind of work: '+r.reason+' Do it as head, or name a provider to delegate anyway.');if(r.provider===COORDINATOR_ID)throw Error('Claude keeps this kind of work: '+r.reason+' Do it here, or name a provider to delegate anyway.');}
   if(binding&&(['perplexity','grok','muse'].includes(provider)||category==='video_analysis'))a.baseRef=undefined;
   const requestedScope=category==='social_research'||a.research_scope?researchScope(a.research_scope||{},category==='social_research'?a.task:''):undefined;
   if(provider==='claude')throw Error('Handle this category directly in the Claude coordinator; external delegation is unnecessary unless explicitly requested.');
